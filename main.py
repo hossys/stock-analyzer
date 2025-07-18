@@ -4,11 +4,13 @@ import yfinance as yf
 from ta.momentum import RSIIndicator, StochasticOscillator
 from ta.trend import MACD, EMAIndicator
 from ta.volatility import BollingerBands
-from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 import requests
+import sqlite3
+import os
+import matplotlib.pyplot as plt
+from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 def send_telegram_message(message):
-    """Send a message via Telegram bot."""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -19,6 +21,48 @@ def send_telegram_message(message):
         requests.post(url, json=payload)
     except Exception as e:
         print(f"Telegram error: {e}")
+
+def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal):
+    conn = sqlite3.connect("results.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS analysis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT,
+            timestamp TEXT,
+            close REAL,
+            rsi REAL,
+            stoch REAL,
+            macd_diff REAL,
+            ema20 REAL,
+            ema50 REAL,
+            bb_lower REAL,
+            bb_upper REAL,
+            signal TEXT
+        )
+    """)
+    c.execute("""
+        INSERT INTO analysis (symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal))
+    conn.commit()
+    conn.close()
+
+def plot_chart(symbol, close, bb_upper, bb_lower):
+    if not os.path.exists("charts"):
+        os.makedirs("charts")
+    plt.figure(figsize=(10, 6))
+    plt.plot(close.index, close, label="Close Price", linewidth=2)
+    plt.plot(bb_upper.index, bb_upper, '--', label="BB Upper")
+    plt.plot(bb_lower.index, bb_lower, '--', label="BB Lower")
+    plt.title(f"{symbol} - Price & Bollinger Bands")
+    plt.xlabel("Date")
+    plt.ylabel("Price")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f"charts/{symbol}_{datetime.now().strftime('%Y%m%d_%H%M')}.png")
+    plt.close()
 
 def analyze_stock(symbol):
     print(f"\n📈 {symbol} — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
@@ -57,63 +101,40 @@ def analyze_stock(symbol):
         and latest_stoch < 20
         and latest_close < latest_bb_lower
     ):
-        signal = "🟢 *STRONG BUY* (Oversold + Trend)"
+        signal = "🟢 STRONG BUY (Oversold + Trend)"
     elif (
         latest_ema20 < latest_ema50
         and latest_rsi > 70
         and latest_stoch > 80
         and latest_close > latest_bb_upper
     ):
-        signal = "🔴 *STRONG SELL* (Overbought + Trend)"
+        signal = "🔴 STRONG SELL (Overbought + Trend)"
     else:
-        signal = "⚪ *HOLD* (Neutral/Mixed)"
+        signal = "➡️ HOLD (Neutral/Mixed)"
 
-    msg = (
-        f"📈 *{symbol}* — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
-        f"Close: `{latest_close:.2f}`\n"
-        f"RSI: `{latest_rsi:.2f}` | Stoch: `{latest_stoch:.2f}` | MACD Δ: `{latest_macd_diff:.4f}`\n"
-        f"EMA-20: `{latest_ema20:.2f}` | EMA-50: `{latest_ema50:.2f}`\n"
-        f"Bollinger: `{latest_bb_lower:.2f}` — `{latest_bb_upper:.2f}`\n"
-        f"📊 Signal: {signal}"
-    )
-
-    print(msg)
-    send_telegram_message(msg)
+    print(f"Close: {latest_close:.2f}")
+    print(f"RSI: {latest_rsi:.2f} | Stoch: {latest_stoch:.2f} | MACD Δ: {latest_macd_diff:.4f}")
+    print(f"EMA-20: {latest_ema20:.2f} | EMA-50: {latest_ema50:.2f}")
+    print(f"Bollinger Bands: {latest_bb_lower:.2f} - {latest_bb_upper:.2f}")
+    print(f"📊 Signal: {signal}")
 
     with open("results.txt", "a") as f:
-        f.write(msg + "\n\n")
+        f.write(f"\n📈 {symbol} — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
+        f.write(f"Close: {latest_close:.2f}\n")
+        f.write(f"RSI: {latest_rsi:.2f} | Stoch: {latest_stoch:.2f} | MACD Δ: {latest_macd_diff:.4f}\n")
+        f.write(f"EMA-20: {latest_ema20:.2f} | EMA-50: {latest_ema50:.2f}\n")
+        f.write(f"Bollinger Bands: {latest_bb_lower:.2f} - {latest_bb_upper:.2f}\n")
+        f.write(f"📊 Signal: {signal}\n")
 
-def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal):
-    conn = sqlite3.connect("results.db")
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS analysis (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol TEXT,
-            timestamp TEXT,
-            close REAL,
-            rsi REAL,
-            stoch REAL,
-            macd_diff REAL,
-            ema20 REAL,
-            ema50 REAL,
-            bb_lower REAL,
-            bb_upper REAL,
-            signal TEXT
-        )
-    """)
-    c.execute("""
-        INSERT INTO analysis (symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal))
-    conn.commit()
-    conn.close()
+    log_to_database(symbol, datetime.now().strftime('%Y-%m-%d %H:%M'), latest_close, latest_rsi, latest_stoch,
+                    latest_macd_diff, latest_ema20, latest_ema50, latest_bb_lower, latest_bb_upper, signal)
 
-def main():
+    plot_chart(symbol, close, bb_upper, bb_lower)
+
+    send_telegram_message(f"*{symbol}* - {datetime.now().strftime('%Y-%m-%d %H:%M')}\nSignal: {signal}")
+
+if __name__ == "__main__":
     print("=== ADVANCED STOCK ANALYZER (HOURLY) ===")
     symbols = ["AAPL", "GOOGL", "MSFT", "NVDA", "AMZN"]
     for symbol in symbols:
         analyze_stock(symbol)
-
-if __name__ == "__main__":
-    main()
