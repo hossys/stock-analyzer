@@ -13,7 +13,7 @@ from scipy.stats import norm
 import scipy.stats as stats
 import numpy as np
 import joblib
-
+import csv
 
 
 try:
@@ -21,6 +21,23 @@ try:
 except Exception as e:
     model = None
     print(f"⚠️ ML model not loaded: {e}")
+
+
+
+def save_to_csv(symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50,
+                bb_lower, bb_upper, est_low, est_high, signal, prob_low, prob_high):
+    file_exists = os.path.isfile("historical_signals.csv")
+    with open("historical_signals.csv", mode="a", newline="") as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow([
+                "symbol", "timestamp", "close", "rsi", "stoch", "macd_diff", "ema20", "ema50",
+                "bb_lower", "bb_upper", "est_low", "est_high", "signal", "prob_low", "prob_high"
+            ])
+        writer.writerow([
+            symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50,
+            bb_lower, bb_upper, est_low, est_high, signal, prob_low, prob_high
+        ])
 
 
 def estimate_price_probability(current_price, target_price, historical_prices):
