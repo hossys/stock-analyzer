@@ -26,6 +26,17 @@ except Exception as e:
 def estimate_with_ml(model, features: pd.DataFrame) -> float:
     return model.predict_proba(features)[0][1] * 100
 
+
+def estimate_probability_with_ml(model, features):
+    if model is None:
+        return None
+    try:
+        prob = model.predict_proba([features])[0][1]   
+        return round(prob * 100, 2)
+    except Exception as e:
+        print(f"⚠️ ML prediction failed: {e}")
+        return None
+
 def save_to_csv(symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50,
                 bb_lower, bb_upper, est_low, est_high, signal, prob_low, prob_high):
     file_exists = os.path.isfile("historical_signals.csv")
