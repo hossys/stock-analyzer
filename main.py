@@ -16,6 +16,7 @@ import joblib
 import csv
 
 
+
 try:
     model = joblib.load("trained_model.pkl")
 except Exception as e:
