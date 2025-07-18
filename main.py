@@ -9,8 +9,27 @@ import sqlite3
 import os
 import matplotlib.pyplot as plt
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from scipy.stats import norm
+import scipy.stats as stats
+import numpy as np
 
+def estimate_price_probability(current_price, target_price, historical_prices):
+    
+    historical_prices = np.array(historical_prices)
+    log_returns = np.log(historical_prices[1:] / historical_prices[:-1])
+    mean_return = np.mean(log_returns)
+    std_dev = np.std(log_returns)
 
+    price_ratio = target_price / current_price
+    z_score = (np.log(price_ratio) - mean_return) / std_dev
+
+    if target_price > current_price:
+        prob = 1 - norm.cdf(z_score)
+    else:
+        prob = norm.cdf(z_score)
+
+    return round(prob * 100, 2)
+    
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -119,11 +138,25 @@ def analyze_stock(symbol):
     else:
         signal = "➡️ HOLD (Neutral/Mixed)"
 
+    mean = close.mean()
+    std = close.std()
+    est_low = round(latest_close - std, 2)
+    est_high = round(latest_close + std, 2)
+
+    prob_low = stats.norm(loc=mean, scale=std).cdf(est_low)
+    prob_high = 1 - stats.norm(loc=mean, scale=std).cdf(est_high)
+
+    prob_low_pct = round(prob_low * 100, 1)
+    prob_high_pct = round(prob_high * 100, 1)
+
     print(f"Close: {latest_close:.2f}")
     print(f"RSI: {latest_rsi:.2f} | Stoch: {latest_stoch:.2f} | MACD Δ: {latest_macd_diff:.4f}")
     print(f"EMA-20: {latest_ema20:.2f} | EMA-50: {latest_ema50:.2f}")
     print(f"Bollinger Bands: {latest_bb_lower:.2f} - {latest_bb_upper:.2f}")
     print(f"📊 Signal: {signal}")
+    print(f"🔮 Estimated Range: ${est_low} – ${est_high}")
+    print(f"📈 Chance to reach {est_high}: {prob_high_pct}%")
+    print(f"📉 Chance to drop to {est_low}: {prob_low_pct}%")
 
     with open("results.txt", "a") as f:
         f.write(f"\n📈 {symbol} — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
@@ -132,12 +165,25 @@ def analyze_stock(symbol):
         f.write(f"EMA-20: {latest_ema20:.2f} | EMA-50: {latest_ema50:.2f}\n")
         f.write(f"Bollinger Bands: {latest_bb_lower:.2f} - {latest_bb_upper:.2f}\n")
         f.write(f"📊 Signal: {signal}\n")
+        f.write(f"🔮 Estimated Range: ${est_low} – ${est_high}\n")
+        f.write(f"📈 Chance to reach {est_high}: {prob_high_pct}%\n")
+        f.write(f"📉 Chance to drop to {est_low}: {prob_low_pct}%\n")
 
     log_to_database(symbol, datetime.now().strftime('%Y-%m-%d %H:%M'), latest_close, latest_rsi, latest_stoch,
                     latest_macd_diff, latest_ema20, latest_ema50, latest_bb_lower, latest_bb_upper, signal)
 
     image_path = plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50)
-    send_telegram_message(f"*{symbol}* - {datetime.now().strftime('%Y-%m-%d %H:%M')}\nSignal: {signal}")
+
+    telegram_msg = (
+        f"*{symbol}* — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        f"💵 Price: ${latest_close:.2f}\n"
+        f"📊 Signal: {signal}\n"
+        f"🔮 Range: ${est_low} – ${est_high}\n"
+        f"📈 Chance to reach {est_high}: {prob_high_pct}%\n"
+        f"📉 Chance to drop to {est_low}: {prob_low_pct}%"
+    )
+    send_telegram_message(telegram_msg)
+
     return image_path
 
 
