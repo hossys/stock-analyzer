@@ -43,7 +43,8 @@ def send_telegram_message(message):
         print(f"Telegram error: {e}")
 
 
-def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal):
+def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal,
+                    est_low=None, est_high=None, prob_low_pct=None, prob_high_pct=None):
     conn = sqlite3.connect("results.db")
     c = conn.cursor()
     c.execute("""
@@ -59,13 +60,24 @@ def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb
         ema50 REAL,
         bb_lower REAL,
         bb_upper REAL,
-        signal TEXT
+        signal TEXT,
+        est_low REAL,
+        est_high REAL,
+        prob_low_pct REAL,
+        prob_high_pct REAL
     )
 """)
     c.execute("""
-    INSERT INTO analysis_results (symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-""", (symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal))
+    INSERT INTO analysis_results (
+        symbol, timestamp, close, rsi, stoch, macd_diff,
+        ema20, ema50, bb_lower, bb_upper, signal,
+        est_low, est_high, prob_low_pct, prob_high_pct
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+""", (
+        symbol, time, close, rsi, stoch, macd_diff,
+        ema20, ema50, bb_lower, bb_upper, signal,
+        est_low, est_high, prob_low_pct, prob_high_pct
+    ))
     conn.commit()
     conn.close()
 
