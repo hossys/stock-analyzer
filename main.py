@@ -24,15 +24,6 @@ def send_telegram_message(message):
         print(f"Telegram error: {e}")
 
 
-def send_chart_to_telegram(image_path):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
-    with open(image_path, 'rb') as photo:
-        try:
-            requests.post(url, files={"photo": photo}, data={"chat_id": TELEGRAM_CHAT_ID})
-        except Exception as e:
-            print(f"Telegram photo error: {e}")
-
-
 def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal):
     conn = sqlite3.connect("results.db")
     c = conn.cursor()
@@ -78,7 +69,6 @@ def plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50):
     image_path = f"charts/{symbol}_{datetime.now().strftime('%Y%m%d_%H%M')}.png"
     plt.savefig(image_path)
     plt.close()
-    return image_path
 
 
 def analyze_stock(symbol):
@@ -145,8 +135,7 @@ def analyze_stock(symbol):
     log_to_database(symbol, datetime.now().strftime('%Y-%m-%d %H:%M'), latest_close, latest_rsi, latest_stoch,
                     latest_macd_diff, latest_ema20, latest_ema50, latest_bb_lower, latest_bb_upper, signal)
 
-    image_path = plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50)
-    send_chart_to_telegram(image_path)
+    plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50)
 
     send_telegram_message(f"*{symbol}* - {datetime.now().strftime('%Y-%m-%d %H:%M')}\nSignal: {signal}")
 
