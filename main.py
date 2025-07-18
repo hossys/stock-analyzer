@@ -23,6 +23,17 @@ except Exception as e:
     model = None
     print(f"⚠️ ML model not loaded: {e}")
 
+
+
+
+def append_to_dataset(row, filename="dataset.csv"):
+    file_exists = os.path.isfile(filename)
+    with open(filename, mode="a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["rsi", "stoch", "macd", "ema20", "ema50", "close", "label"])
+        writer.writerow(row)
+
 def estimate_with_ml(model, features: pd.DataFrame) -> float:
     return model.predict_proba(features)[0][1] * 100
 
@@ -331,7 +342,11 @@ def analyze_stock(symbol):
         f"📈 Chance to reach {est_high}: {prob_high_pct}%\n"
         f"📉 Chance to drop to {est_low}: {prob_low_pct}%"
     )
-
+        label = signal.split()[1]  # STRONG BUY → BUY
+    append_to_dataset([
+        latest_rsi, latest_stoch, latest_macd_diff,
+        latest_ema20, latest_ema50, latest_close, label
+    ])
     send_telegram_message(telegram_msg)
     return image_path
 
