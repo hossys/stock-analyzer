@@ -78,7 +78,7 @@ def analyze_stock(symbol):
 
     if data.empty or "Close" not in data:
         print(f"[{symbol}] ⚠️ No data found.")
-        return
+        return None
 
     close = data["Close"].squeeze()
     high = data["High"].squeeze()
@@ -136,13 +136,32 @@ def analyze_stock(symbol):
     log_to_database(symbol, datetime.now().strftime('%Y-%m-%d %H:%M'), latest_close, latest_rsi, latest_stoch,
                     latest_macd_diff, latest_ema20, latest_ema50, latest_bb_lower, latest_bb_upper, signal)
 
-    plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50)
-
+    image_path = plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50)
     send_telegram_message(f"*{symbol}* - {datetime.now().strftime('%Y-%m-%d %H:%M')}\nSignal: {signal}")
+    return image_path
 
 
 if __name__ == "__main__":
     print("=== ADVANCED STOCK ANALYZER (HOURLY) ===")
     symbols = ["AAPL", "GOOGL", "MSFT", "NVDA", "AMZN", "TSLA", "AMD", "COIN", "LCID"]
+    image_paths = {}
+
     for symbol in symbols:
-        analyze_stock(symbol)
+        result = analyze_stock(symbol)
+        if result:
+            image_paths[symbol] = result
+
+    if image_paths:
+        print("\nAvailable plots:")
+        for i, symbol in enumerate(image_paths.keys(), 1):
+            print(f"{i}. {symbol}")
+
+        choice = input("\nEnter the number of the stock to view its chart: ")
+        try:
+            index = int(choice) - 1
+            selected_symbol = list(image_paths.keys())[index]
+            selected_path = image_paths[selected_symbol]
+            from PIL import Image
+            Image.open(selected_path).show()
+        except Exception as e:
+            print(f"Invalid selection: {e}")
