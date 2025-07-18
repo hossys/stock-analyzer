@@ -10,6 +10,7 @@ import os
 import matplotlib.pyplot as plt
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
+
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -21,6 +22,16 @@ def send_telegram_message(message):
         requests.post(url, json=payload)
     except Exception as e:
         print(f"Telegram error: {e}")
+
+
+def send_chart_to_telegram(image_path):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
+    with open(image_path, 'rb') as photo:
+        try:
+            requests.post(url, files={"photo": photo}, data={"chat_id": TELEGRAM_CHAT_ID})
+        except Exception as e:
+            print(f"Telegram photo error: {e}")
+
 
 def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal):
     conn = sqlite3.connect("results.db")
@@ -48,25 +59,30 @@ def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb
     conn.commit()
     conn.close()
 
-def plot_chart(symbol, close, bb_upper, bb_lower):
+
+def plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50):
     if not os.path.exists("charts"):
         os.makedirs("charts")
     plt.figure(figsize=(10, 6))
-    plt.plot(close.index, close, label="Close Price", linewidth=2)
-    plt.plot(bb_upper.index, bb_upper, '--', label="BB Upper")
-    plt.plot(bb_lower.index, bb_lower, '--', label="BB Lower")
-    plt.title(f"{symbol} - Price & Bollinger Bands")
+    plt.plot(close.index, close, label="Close Price", linewidth=2, color='black')
+    plt.plot(ema20.index, ema20, label="EMA-20", color="blue")
+    plt.plot(ema50.index, ema50, label="EMA-50", color="orange")
+    plt.plot(bb_upper.index, bb_upper, '--', label="BB Upper", color="green")
+    plt.plot(bb_lower.index, bb_lower, '--', label="BB Lower", color="red")
+    plt.title(f"{symbol} - Technical Chart ({datetime.now().strftime('%Y-%m-%d %H:%M')})")
     plt.xlabel("Date")
     plt.ylabel("Price")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f"charts/{symbol}_{datetime.now().strftime('%Y%m%d_%H%M')}.png")
+    image_path = f"charts/{symbol}_{datetime.now().strftime('%Y%m%d_%H%M')}.png"
+    plt.savefig(image_path)
     plt.close()
+    return image_path
+
 
 def analyze_stock(symbol):
     print(f"\n📈 {symbol} — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-
     data = yf.download(symbol, period="10d", interval="1h", progress=False, auto_adjust=False)
 
     if data.empty or "Close" not in data:
@@ -129,9 +145,11 @@ def analyze_stock(symbol):
     log_to_database(symbol, datetime.now().strftime('%Y-%m-%d %H:%M'), latest_close, latest_rsi, latest_stoch,
                     latest_macd_diff, latest_ema20, latest_ema50, latest_bb_lower, latest_bb_upper, signal)
 
-    plot_chart(symbol, close, bb_upper, bb_lower)
+    image_path = plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50)
+    send_chart_to_telegram(image_path)
 
     send_telegram_message(f"*{symbol}* - {datetime.now().strftime('%Y-%m-%d %H:%M')}\nSignal: {signal}")
+
 
 if __name__ == "__main__":
     print("=== ADVANCED STOCK ANALYZER (HOURLY) ===")
