@@ -23,7 +23,8 @@ except Exception as e:
     model = None
     print(f"⚠️ ML model not loaded: {e}")
 
-
+def estimate_with_ml(model, features: pd.DataFrame) -> float:
+    return model.predict_proba(features)[0][1] * 100
 
 def save_to_csv(symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50,
                 bb_lower, bb_upper, est_low, est_high, signal, prob_low, prob_high):
@@ -184,6 +185,19 @@ def analyze_stock(symbol):
     latest_bb_upper = bb_upper.iloc[-1]
     latest_bb_lower = bb_lower.iloc[-1]
 
+
+    if model:
+    features = pd.DataFrame([{
+        "close": latest_close,
+        "rsi": latest_rsi,
+        "stoch": latest_stoch,
+        "macd_diff": latest_macd_diff,
+        "ema20": latest_ema20,
+        "ema50": latest_ema50
+    }])
+    ml_prob = estimate_with_ml(model, features)
+    print(f"🤖 ML Estimated ↑ Chance: {ml_prob:.2f}%")
+    
     if (
         latest_ema20 > latest_ema50
         and latest_rsi < 30
