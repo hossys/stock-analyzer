@@ -12,7 +12,10 @@ DB_PATH = "results.db"  # or use results.txt if preferred
 def get_latest_signals():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT symbol, signal, timestamp FROM analysis_results ORDER BY timestamp DESC")
+    cursor.execute("""
+    SELECT symbol, signal, timestamp, est_low, est_high, prob_low_pct, prob_high_pct
+    FROM analysis_results
+    ORDER BY timestamp DESC""")
     rows = cursor.fetchall()
     conn.close()
 
