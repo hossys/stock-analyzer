@@ -312,7 +312,17 @@ def analyze_stock(symbol):
     prob_low=prob_low_pct,
     prob_high=prob_high_pct
 )
-
+        ml_features = [
+        latest_close,
+        latest_rsi,
+        latest_stoch,
+        latest_macd_diff,
+        latest_ema20,
+        latest_ema50,
+        latest_bb_lower,
+        latest_bb_upper
+    ]
+    
     telegram_msg = (
         f"*{symbol}* — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
         f"💵 Price: ${latest_close:.2f}\n"
@@ -348,5 +358,9 @@ if __name__ == "__main__":
             selected_path = image_paths[selected_symbol]
             from PIL import Image
             Image.open(selected_path).show()
+            ml_prob = estimate_probability_with_ml(model, ml_features)
+            if ml_prob is not None:
+                print(f"🤖 ML Estimated chance of price increase: {ml_prob}%")
+        
         except Exception as e:
             print(f"Invalid selection: {e}")
