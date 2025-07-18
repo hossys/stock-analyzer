@@ -60,15 +60,16 @@ def plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50):
     plt.plot(ema50.index, ema50, label="EMA-50", color="orange")
     plt.plot(bb_upper.index, bb_upper, '--', label="BB Upper", color="green")
     plt.plot(bb_lower.index, bb_lower, '--', label="BB Lower", color="red")
-    plt.title(f"{symbol} - Technical Chart ({datetime.now().strftime('%Y-%m-%d %H:%M')})")
+    plt.title(f"{symbol} - Technical Chart")
     plt.xlabel("Date")
     plt.ylabel("Price")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    image_path = f"charts/{symbol}_{datetime.now().strftime('%Y%m%d_%H%M')}.png"
+    image_path = f"charts/{symbol}.png"   
     plt.savefig(image_path)
     plt.close()
+    return image_path
 
 
 def analyze_stock(symbol):
