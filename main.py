@@ -28,25 +28,25 @@ def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb
     conn = sqlite3.connect("results.db")
     c = conn.cursor()
     c.execute("""
-        CREATE TABLE IF NOT EXISTS analysis (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol TEXT,
-            timestamp TEXT,
-            close REAL,
-            rsi REAL,
-            stoch REAL,
-            macd_diff REAL,
-            ema20 REAL,
-            ema50 REAL,
-            bb_lower REAL,
-            bb_upper REAL,
-            signal TEXT
-        )
-    """)
+    CREATE TABLE IF NOT EXISTS analysis_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT,
+        timestamp TEXT,
+        close REAL,
+        rsi REAL,
+        stoch REAL,
+        macd_diff REAL,
+        ema20 REAL,
+        ema50 REAL,
+        bb_lower REAL,
+        bb_upper REAL,
+        signal TEXT
+    )
+""")
     c.execute("""
-        INSERT INTO analysis (symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal))
+    INSERT INTO analysis_results (symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+""", (symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal))
     conn.commit()
     conn.close()
 
