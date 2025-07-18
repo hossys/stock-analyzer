@@ -153,6 +153,6 @@ def analyze_stock(symbol):
 
 if __name__ == "__main__":
     print("=== ADVANCED STOCK ANALYZER (HOURLY) ===")
-    symbols = ["AAPL", "GOOGL", "MSFT", "NVDA", "AMZN"]
+    symbols = ["AAPL", "GOOGL", "MSFT", "NVDA", "AMZN", "TSLA", "AMD", "COIN", "LCID"]
     for symbol in symbols:
         analyze_stock(symbol)
