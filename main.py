@@ -209,6 +209,7 @@ def analyze_stock(symbol):
     prob_low = stats.norm(loc=mean, scale=std).cdf(est_low)
     prob_high = 1 - stats.norm(loc=mean, scale=std).cdf(est_high)
 
+
     prob_low_pct = round(prob_low * 100, 1)
     prob_high_pct = round(prob_high * 100, 1)
 
