@@ -30,8 +30,14 @@ def get_latest_signals():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     signals = get_latest_signals()
     message = "📊 Latest stock signals:\n\n"
-    for symbol, signal, timestamp in signals:
-        message += f"{symbol} - {timestamp}\nSignal: {signal}\n\n"
+    for symbol, signal, timestamp, est_low, est_high, prob_low, prob_high in signals:
+        message += (
+        f"📈 {symbol} — {timestamp}\n"
+        f"Signal: {signal}\n"
+        f"🔮 Range: ${est_low:.2f} – ${est_high:.2f}\n"
+        f"📈 Chance to reach {est_high:.2f}: {prob_high:.1f}%\n"
+        f"📉 Chance to drop to {est_low:.2f}: {prob_low:.1f}%\n\n"
+    )
     await update.message.reply_text(message)
 
 async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
