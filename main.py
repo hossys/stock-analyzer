@@ -237,7 +237,19 @@ def analyze_stock(symbol):
         prob_high_pct
     )
 
-    image_path = plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50)
+       image_path = plot_chart(
+    symbol,
+    close,
+    bb_upper,
+    bb_lower,
+    ema20,
+    ema50,
+    est_low=est_low,
+    est_high=est_high,
+    signal=signal,
+    prob_low_pct=prob_low_pct,
+    prob_high_pct=prob_high_pct
+)
 
     telegram_msg = (
         f"*{symbol}* — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
