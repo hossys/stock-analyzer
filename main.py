@@ -12,6 +12,14 @@ from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 from scipy.stats import norm
 import scipy.stats as stats
 import numpy as np
+import joblib
+
+try:
+    model = joblib.load("trained_model.pkl")
+except Exception as e:
+    model = None
+    print(f"⚠️ ML model not loaded: {e}")
+
 
 def estimate_price_probability(current_price, target_price, historical_prices):
     
