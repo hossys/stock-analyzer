@@ -179,18 +179,38 @@ def analyze_stock(symbol):
     print(f"📉 Chance to drop to {est_low}: {prob_low_pct}%")
 
     with open("results.txt", "a") as f:
-        f.write(f"\n📈 {symbol} — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
-        f.write(f"Close: {latest_close:.2f}\n")
-        f.write(f"RSI: {latest_rsi:.2f} | Stoch: {latest_stoch:.2f} | MACD Δ: {latest_macd_diff:.4f}\n")
-        f.write(f"EMA-20: {latest_ema20:.2f} | EMA-50: {latest_ema50:.2f}\n")
-        f.write(f"Bollinger Bands: {latest_bb_lower:.2f} - {latest_bb_upper:.2f}\n")
-        f.write(f"📊 Signal: {signal}\n")
-        f.write(f"🔮 Estimated Range: ${est_low} – ${est_high}\n")
-        f.write(f"📈 Chance to reach {est_high}: {prob_high_pct}%\n")
-        f.write(f"📉 Chance to drop to {est_low}: {prob_low_pct}%\n")
+    f.write(f"\n📈 {symbol} — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
+    f.write(f"💵 Close: {latest_close:.2f}\n")
+    f.write(f"📊 RSI: {latest_rsi:.2f} | Stoch: {latest_stoch:.2f} | MACD Δ: {latest_macd_diff:.4f}\n")
+    f.write(f"📈 EMA-20: {latest_ema20:.2f} | EMA-50: {latest_ema50:.2f}\n")
+    f.write(f"📉 Bollinger Bands: {latest_bb_lower:.2f} – {latest_bb_upper:.2f}\n")
+    f.write(f"📊 Signal: {signal}\n")
 
-    log_to_database(symbol, datetime.now().strftime('%Y-%m-%d %H:%M'), latest_close, latest_rsi, latest_stoch,
-                    latest_macd_diff, latest_ema20, latest_ema50, latest_bb_lower, latest_bb_upper, signal)
+    f.write(f"\n🔮 Estimated Range (1σ std): ${est_low} – ${est_high}\n")
+    f.write(f"📈 Chance to reach {est_high}: {prob_high_pct}%\n")
+    f.write(f"📉 Chance to drop to {est_low}: {prob_low_pct}%\n")
+
+    f.write(f"\n🔮 Bollinger Band Range: ${latest_bb_lower:.2f} – {latest_bb_upper:.2f}\n")
+    f.write(f"📈 Chance to reach {latest_bb_upper:.2f}: {prob_high_pct}%\n")
+    f.write(f"📉 Chance to drop to {latest_bb_lower:.2f}: {prob_low_pct}%\n")
+    
+    log_to_database(
+        symbol,
+        datetime.now().strftime('%Y-%m-%d %H:%M'),
+        latest_close,
+        latest_rsi,
+        latest_stoch,
+        latest_macd_diff,
+        latest_ema20,
+        latest_ema50,
+        latest_bb_lower,
+        latest_bb_upper,
+        signal,
+        est_low,
+        est_high,
+        prob_low_pct,
+        prob_high_pct
+    )
 
     image_path = plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50)
 
@@ -202,8 +222,8 @@ def analyze_stock(symbol):
         f"📈 Chance to reach {est_high}: {prob_high_pct}%\n"
         f"📉 Chance to drop to {est_low}: {prob_low_pct}%"
     )
-    send_telegram_message(telegram_msg)
 
+    send_telegram_message(telegram_msg)
     return image_path
 
 
