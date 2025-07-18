@@ -14,6 +14,8 @@ import scipy.stats as stats
 import numpy as np
 import joblib
 
+
+
 try:
     model = joblib.load("trained_model.pkl")
 except Exception as e:
@@ -90,22 +92,45 @@ def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb
     conn.close()
 
 
-def plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50):
+
+
+def plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50,
+               est_low=None, est_high=None, signal=None,
+               prob_low_pct=None, prob_high_pct=None):
     if not os.path.exists("charts"):
         os.makedirs("charts")
+
     plt.figure(figsize=(10, 6))
     plt.plot(close.index, close, label="Close Price", linewidth=2, color='black')
     plt.plot(ema20.index, ema20, label="EMA-20", color="blue")
     plt.plot(ema50.index, ema50, label="EMA-50", color="orange")
     plt.plot(bb_upper.index, bb_upper, '--', label="BB Upper", color="green")
     plt.plot(bb_lower.index, bb_lower, '--', label="BB Lower", color="red")
+
+
+    if est_low is not None and est_high is not None:
+        plt.axhspan(est_low, est_high, color='yellow', alpha=0.2,
+                    label=f"Est. Range: ${est_low} – ${est_high}")
+
+
+    if signal and prob_low_pct is not None and prob_high_pct is not None:
+        annotation_text = (
+            f"Signal: {signal}\n"
+            f"⬆ {prob_high_pct}% to reach ${est_high}\n"
+            f"⬇ {prob_low_pct}% to drop to ${est_low}"
+        )
+        plt.annotate(annotation_text, xy=(0.02, 0.95), xycoords='axes fraction',
+                     fontsize=9, bbox=dict(boxstyle="round", fc="w", alpha=0.7),
+                     verticalalignment='top')
+
     plt.title(f"{symbol} - Technical Chart")
     plt.xlabel("Date")
     plt.ylabel("Price")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    image_path = f"charts/{symbol}.png"   
+
+    image_path = f"charts/{symbol}.png"
     plt.savefig(image_path)
     plt.close()
     return image_path
