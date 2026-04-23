@@ -39,69 +39,63 @@ def fetch_fundamentals(ticker: str) -> dict:
         return {}
 
 
-def score_fundamentals(fund: dict) -> tuple[float, str, str]:
-    """Returns (boost, quality_label, display_text)."""
+def _piotroski_score(fund: dict) -> int:
+    """Simplified Piotroski F-Score (0-9). Higher = stronger fundamentals."""
     score = 0
+    # Profitability
+    if (fund.get("roe") or 0) > 0:                          score += 1  # positive ROE
+    if (fund.get("profit_margin") or 0) > 0:                score += 1  # positive margin
+    if (fund.get("revenue_growth") or 0) > 0:               score += 1  # growing revenue
+    if (fund.get("earnings_growth") or 0) > 0:              score += 1  # growing earnings
+    # Financial strength
+    debt = fund.get("debt_to_equity") or 999
+    if debt < 100:                                           score += 1  # low debt
+    if (fund.get("current_ratio") or 0) > 1.0:              score += 1  # liquid
+    # Valuation / efficiency
+    pb = fund.get("price_to_book") or 999
+    if 0 < pb < 5:                                           score += 1  # reasonable P/B
+    pe = fund.get("pe_ratio") or 999
+    if 0 < pe < 30:                                          score += 1  # reasonable P/E
+    fpe = fund.get("forward_pe") or 999
+    if 0 < fpe < pe:                                         score += 1  # forward P/E improving
+    return score
+
+
+def score_fundamentals(fund: dict) -> tuple[float, str, str]:
+    """Returns (boost, quality_label, display_text) using Piotroski-inspired scoring."""
+    if not fund:
+        return 0.0, "", "N/A"
+
+    piotroski = _piotroski_score(fund)   # 0-9
+    # Map 0-9 → -15 to +15 boost
+    boost = round((piotroski - 4.5) / 4.5 * 15, 1)
+    boost = max(-15.0, min(15.0, boost))
+
+    # Human-readable label
+    if piotroski >= 7:
+        label = "Excellent 💪"
+    elif piotroski >= 5:
+        label = "Solid ✅"
+    elif piotroski >= 3:
+        label = "Mixed ⚠️"
+    else:
+        label = "Weak ❌"
+
+    # Build short display string from available data
     parts = []
-
     pe = fund.get("pe_ratio")
-    if pe is not None:
-        if 5 < pe < 25:
-            score += 3
-            parts.append(f"P/E {pe:.0f}✅")
-        elif 25 <= pe <= 40:
-            parts.append(f"P/E {pe:.0f}⚠️")
-        elif pe > 40:
-            score -= 4
-            parts.append(f"P/E {pe:.0f}❌")
-
+    if pe:
+        parts.append(f"P/E {pe:.0f}")
     margin = fund.get("profit_margin")
     if margin is not None:
-        if margin > 0.20:
-            score += 5
-            parts.append(f"Margin {margin*100:.0f}%✅")
-        elif margin > 0.08:
-            score += 2
-            parts.append(f"Margin {margin*100:.0f}%")
-        elif margin < 0:
-            score -= 8
-            parts.append(f"Margin {margin*100:.0f}%❌")
-
+        parts.append(f"Margin {margin*100:.0f}%")
     growth = fund.get("revenue_growth")
     if growth is not None:
-        if growth > 0.15:
-            score += 5
-            parts.append(f"Rev+{growth*100:.0f}%✅")
-        elif growth > 0.05:
-            score += 2
-            parts.append(f"Rev+{growth*100:.0f}%")
-        elif growth < 0:
-            score -= 4
-            parts.append(f"Rev{growth*100:.0f}%❌")
-
-    debt = fund.get("debt_to_equity")
-    if debt is not None:
-        if debt < 50:
-            score += 2
-        elif debt > 200:
-            score -= 4
-            parts.append(f"Debt/Eq {debt:.0f}❌")
-
-    score = max(-15.0, min(15.0, float(score)))
-
-    if score >= 8:
-        label = "Strong 💪"
-    elif score >= 2:
-        label = "Solid"
-    elif score >= -3:
-        label = "Mixed"
-    elif score >= -8:
-        label = "Weak ⚠️"
-    else:
-        label = "Poor ❌"
-
+        sign = "+" if growth >= 0 else ""
+        parts.append(f"Rev {sign}{growth*100:.0f}%")
     display = " | ".join(parts[:3]) if parts else "N/A"
-    return score, label, display
+    display += f" (F-Score {piotroski}/9)"
+    return boost, label, display
 
 
 def fetch_all_fundamentals(tickers: list[str]) -> dict[str, dict]:

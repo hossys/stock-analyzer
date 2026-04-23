@@ -23,6 +23,8 @@ FEATURE_COLS = [
     "high_52w_ratio", "low_52w_ratio",
     # Seasonality
     "month", "day_of_week",
+    # 12M-1M momentum (trend minus short-term reversal)
+    "momentum_12m_1m",
     # Macro (filled in main.py from macro_features)
     "vix_level", "vix_chg_10d", "yield_10y", "yield_chg_20d", "dollar_chg_20d",
     # Relative strength vs sector (filled in main.py)
@@ -95,6 +97,10 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     # Seasonality
     f["month"] = df.index.month.astype(float)
     f["day_of_week"] = df.index.dayofweek.astype(float)
+
+    # 12M minus 1M momentum — one of the strongest known quant signals
+    # Captures trend while avoiding short-term mean reversion
+    f["momentum_12m_1m"] = close.pct_change(252) - close.pct_change(21)
 
     # Macro + relative strength — zeroed here, filled in main.py after all data is loaded
     for col in ["vix_level", "vix_chg_10d", "yield_10y", "yield_chg_20d",

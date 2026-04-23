@@ -19,6 +19,8 @@ from fundamental import fetch_all_fundamentals, score_fundamentals
 from sentiment import get_all_sentiments
 from insider import get_all_insider_signals
 from earnings import get_all_earnings
+from analyst import get_all_analyst_signals
+from options_sentiment import get_all_pc_ratios
 from market_regime import detect_regime, compute_sector_momentum, sector_boost
 from outcome_tracker import save_prediction_prices, update_outcomes
 from notifier import send_daily_digest
@@ -76,12 +78,14 @@ def _build_features(data: dict, macro_data: dict) -> tuple[dict, dict]:
 
 
 def _apply_boosts(predictions, fundamentals, sentiments, insiders, earnings_data,
-                  sector_mom, regime) -> pd.DataFrame:
+                  analysts, pc_ratios, sector_mom, regime) -> pd.DataFrame:
     predictions = predictions.copy()
     cols = {
         "fund_score": [], "fund_label": [], "fund_display": [],
         "sent_boost": [], "sentiment_label": [],
         "insider_boost": [], "insider_label": [],
+        "analyst_boost": [], "analyst_label": [],
+        "pc_boost": [], "pc_label": [],
         "sector_boost_val": [],
         "earnings_warning": [], "earnings_note": [],
     }
@@ -102,6 +106,14 @@ def _apply_boosts(predictions, fundamentals, sentiments, insiders, earnings_data
         cols["insider_boost"].append(ins.get("insider_boost", 0.0))
         cols["insider_label"].append(ins.get("insider_label", ""))
 
+        an = analysts.get(t, {})
+        cols["analyst_boost"].append(an.get("analyst_boost", 0.0))
+        cols["analyst_label"].append(an.get("analyst_label", ""))
+
+        pc = pc_ratios.get(t, {})
+        cols["pc_boost"].append(pc.get("pc_boost", 0.0))
+        cols["pc_label"].append(pc.get("pc_label", ""))
+
         cols["sector_boost_val"].append(sector_boost(t, sector_mom))
 
         earn = earnings_data.get(t, {})
@@ -116,9 +128,10 @@ def _apply_boosts(predictions, fundamentals, sentiments, insiders, earnings_data
         + predictions["fund_score"]
         + predictions["sent_boost"]
         + predictions["insider_boost"]
+        + predictions["analyst_boost"]
+        + predictions["pc_boost"]
         + predictions["sector_boost_val"]
     )
-    # Reduce score by 30% during earnings uncertainty
     earnings_penalty = predictions["earnings_warning"].map({True: 0.70, False: 1.0})
     multiplier = regime.get("score_multiplier", 1.0)
     predictions["adj_score"] = (raw * multiplier * earnings_penalty).round(1)
@@ -215,13 +228,15 @@ def run():
     sentiments   = get_all_sentiments(tickers)
     sector_mom   = compute_sector_momentum()
 
-    print("\n[7/8] Fetching insider signals & earnings calendar...")
+    print("\n[7/8] Fetching insider signals, analyst ratings, options & earnings...")
     insiders      = get_all_insider_signals(tickers)
     earnings_data = get_all_earnings(tickers)
+    analysts      = get_all_analyst_signals(tickers)
+    pc_ratios     = get_all_pc_ratios(tickers)
 
     predictions = _apply_boosts(
         predictions, fundamentals, sentiments, insiders,
-        earnings_data, sector_mom, regime,
+        earnings_data, analysts, pc_ratios, sector_mom, regime,
     )
 
     print("\n[8/8] Saving results & sending Telegram...")

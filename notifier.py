@@ -53,6 +53,8 @@ def _stock_block(rank: int, row: pd.Series) -> str:
     fund_label   = row.get("fund_label", "")
     sent_label   = row.get("sentiment_label", "")
     insider      = row.get("insider_label", "")
+    analyst      = row.get("analyst_label", "")
+    pc           = row.get("pc_label", "")
     earn_note    = row.get("earnings_note", "")
 
     lines = [
@@ -73,7 +75,10 @@ def _stock_block(rank: int, row: pd.Series) -> str:
 
     if insider:
         lines.append(f"🏢 *Insider activity:* {insider}")
-
+    if analyst:
+        lines.append(f"🟢 *Analysts:* {analyst}")
+    if pc:
+        lines.append(f"📊 *Options market:* {pc}")
     if earn_note:
         lines.append(f"{earn_note}")
 
@@ -90,6 +95,8 @@ def _hints_block() -> str:
         "  💼 Company health = Based on profit, growth & debt\n"
         "  📰 News mood = Recent headlines analyzed by AI\n"
         "  🏢 Insider activity = Are company executives buying or selling?\n"
+        "  🟢 Analysts = What Wall Street professionals recommend\n"
+        "  📊 Options market = Are big investors hedging against a drop?\n"
         "  ⚡ Earnings = Company reports results soon → more volatile, higher risk\n"
         "  🇺🇸 = US stock  |  🇩🇪 = German stock  |  🪙 = Crypto"
     )

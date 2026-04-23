@@ -1,153 +1,279 @@
 import sqlite3
+from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Stock Analyzer", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Stock Analyzer", page_icon="📈", layout="wide",
+                   initial_sidebar_state="collapsed")
 
-st.title("📈 Stock Analyzer — Buy Predictions")
-st.caption("Probabilities of gaining ≥5% / ≥10% / ≥15% within 1 / 3 / 6 months.")
+# ── Custom CSS ────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+[data-testid="stMetric"] { background:#1e2130; border-radius:10px; padding:12px; }
+[data-testid="stMetricLabel"] { font-size:13px; color:#aaa; }
+.signal-strong { color:#00c853; font-weight:bold; }
+.signal-buy    { color:#69f0ae; }
+.signal-watch  { color:#ffd740; }
+.signal-risk   { color:#ff5252; }
+.hint-box { background:#1e2130; border-left:4px solid #7c4dff;
+            padding:12px 16px; border-radius:6px; margin:8px 0; font-size:13px; }
+</style>
+""", unsafe_allow_html=True)
 
 
-@st.cache_data(ttl=1800)
-def load_predictions() -> pd.DataFrame:
+# ── Data loading ──────────────────────────────────────────────────────────────
+@st.cache_data(ttl=900)
+def load_today() -> pd.DataFrame:
     try:
         conn = sqlite3.connect("results.db")
         df = pd.read_sql("SELECT * FROM predictions ORDER BY timestamp DESC", conn)
         conn.close()
-        latest = df["timestamp"].max()
-        return df[df["timestamp"] == latest].copy()
+        if df.empty:
+            return pd.DataFrame()
+        return df[df["timestamp"] == df["timestamp"].max()].copy()
     except Exception:
         return pd.DataFrame()
 
 
-df = load_predictions()
+@st.cache_data(ttl=900)
+def load_accuracy():
+    try:
+        conn = sqlite3.connect("results.db")
+        row = conn.execute("""
+            SELECT
+                SUM(CASE WHEN hit_1M IS NOT NULL THEN 1 ELSE 0 END),
+                ROUND(AVG(CASE WHEN hit_1M IS NOT NULL THEN hit_1M END)*100,1),
+                SUM(CASE WHEN hit_3M IS NOT NULL THEN 1 ELSE 0 END),
+                ROUND(AVG(CASE WHEN hit_3M IS NOT NULL THEN hit_3M END)*100,1),
+                SUM(CASE WHEN hit_6M IS NOT NULL THEN 1 ELSE 0 END),
+                ROUND(AVG(CASE WHEN hit_6M IS NOT NULL THEN hit_6M END)*100,1)
+            FROM outcome_tracking
+        """).fetchone()
+        hist = pd.read_sql("""
+            SELECT ticker, prediction_date, prob_3M, return_3M, hit_3M
+            FROM outcome_tracking WHERE hit_3M IS NOT NULL
+            ORDER BY prediction_date DESC LIMIT 50
+        """, conn)
+        conn.close()
+        return row, hist
+    except Exception:
+        return None, pd.DataFrame()
 
+
+def _signal(adj):
+    if adj >= 65: return "🔥 STRONG BUY"
+    if adj >= 55: return "✅ BUY"
+    if adj >= 45: return "👀 WATCH"
+    return "⏸️ HOLD"
+
+
+def _signal_color(adj):
+    if adj >= 65: return "signal-strong"
+    if adj >= 55: return "signal-buy"
+    if adj >= 45: return "signal-watch"
+    return "signal-risk"
+
+
+df = load_today()
+
+# ── Header ────────────────────────────────────────────────────────────────────
+st.markdown("# 📈 Stock Analyzer")
 if df.empty:
-    st.warning("No predictions yet. Run `python main.py` first to generate predictions.")
+    st.warning("No predictions yet. Run `python main.py` first.")
     st.stop()
 
-last_updated = df["timestamp"].iloc[0] if "timestamp" in df.columns else "unknown"
-st.markdown(f"**Last updated:** {last_updated}")
+last_updated = df["timestamp"].iloc[0]
+st.caption(f"Last updated: **{last_updated}** · {len(df)} assets analyzed")
 
-# ── Filters ────────────────────────────────────────────────────────────────────
-col1, col2, col3 = st.columns(3)
+# ── Market banner ─────────────────────────────────────────────────────────────
+# ── Summary metrics ───────────────────────────────────────────────────────────
+adj_col = "adj_score" if "adj_score" in df.columns else "score"
+strong_buys = (df[adj_col] >= 65).sum()
+buys        = ((df[adj_col] >= 55) & (df[adj_col] < 65)).sum()
+top_pick    = df.iloc[0].get("name", df.iloc[0]["ticker"]) if not df.empty else "—"
+top_score   = df.iloc[0].get(adj_col, 0) if not df.empty else 0
 
-with col1:
-    asset_types = ["All"] + sorted(df["type"].dropna().unique().tolist())
-    selected_type = st.selectbox("Asset type", asset_types)
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Assets Analyzed", f"{len(df)}", "US + German + Crypto")
+c2.metric("🔥 Strong Buys", str(strong_buys), f"+ {buys} Buys")
+c3.metric("⭐ Top Pick Today", top_pick, f"Score {top_score:.0f}")
+c4.metric("📅 Date", last_updated)
 
-with col2:
-    sort_horizon = st.selectbox("Sort by horizon", ["Score", "3M", "1M", "6M"])
+st.divider()
 
-with col3:
-    min_score = st.slider("Min score", 0, 100, 30)
+# ── How to read this? ─────────────────────────────────────────────────────────
+with st.expander("💡 How to read this? (click to expand)", expanded=False):
+    st.markdown("""
+<div class="hint-box">
 
-# ── Filter & sort ──────────────────────────────────────────────────────────────
-filtered = df.copy()
-if selected_type != "All":
-    filtered = filtered[filtered["type"] == selected_type]
+**🔥 STRONG BUY** — AI + all signals (fundamentals, news, analysts, insiders) strongly agree. Highest confidence.<br>
+**✅ BUY** — Good opportunity. Most signals are positive.<br>
+**👀 WATCH** — Interesting but timing is not perfect yet. Keep an eye on it.<br><br>
 
-sort_col = "score" if sort_horizon == "Score" else f"prob_{sort_horizon}"
-if sort_col in filtered.columns:
-    filtered = filtered.sort_values(sort_col, ascending=False)
+**Probabilities** — The % is the AI's estimated chance that the stock reaches the target gain:<br>
+- *1 Month → needs to gain ≥5%*<br>
+- *3 Months → needs to gain ≥10%*<br>
+- *6 Months → needs to gain ≥15%*<br><br>
 
-filtered = filtered[filtered["score"] >= min_score]
+**Adj. Score** — Final score combining: AI prediction + company health + news mood + analyst ratings + insider activity + options market + sector trend.<br><br>
 
-# ── Top picks table ────────────────────────────────────────────────────────────
-st.subheader(f"Top picks ({len(filtered)} assets shown)")
+**💼 Company Health (F-Score /9)** — Rates the company on 9 financial criteria (profitability, debt, growth). 7-9 = excellent, 4-6 = solid, 0-3 = weak.<br>
+**📰 News Mood** — AI reads recent news headlines and rates them positive/negative.<br>
+**🏢 Insider Activity** — Are company executives buying or selling their own stock? Buying is bullish.<br>
+**🟢 Analyst Ratings** — What professional Wall Street analysts recommend.<br>
+**⚡ Earnings Warning** — The company reports quarterly results soon. This makes short-term predictions less reliable.<br>
+**🔴 High Put Buying** — Options traders are buying protection against a drop — a bearish signal from professionals.
 
-display_cols = ["name", "ticker", "type", "prob_1M", "prob_3M", "prob_6M", "score"]
-available = [c for c in display_cols if c in filtered.columns]
-display = filtered[available].head(50).copy()
+</div>
+""", unsafe_allow_html=True)
 
-rename = {
-    "name": "Name", "ticker": "Ticker", "type": "Type",
-    "prob_1M": "1M %", "prob_3M": "3M %", "prob_6M": "6M %", "score": "Score",
-}
-display.rename(columns=rename, inplace=True)
+# ── Main tabs ─────────────────────────────────────────────────────────────────
+tab1, tab2, tab3 = st.tabs(["🏆 Today's Picks", "📊 Charts & Breakdown", "📐 Model Accuracy"])
 
-st.dataframe(
-    display,
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "1M %":   st.column_config.ProgressColumn("1M %",   min_value=0, max_value=100, format="%.1f%%"),
-        "3M %":   st.column_config.ProgressColumn("3M %",   min_value=0, max_value=100, format="%.1f%%"),
-        "6M %":   st.column_config.ProgressColumn("6M %",   min_value=0, max_value=100, format="%.1f%%"),
-        "Score":  st.column_config.ProgressColumn("Score",  min_value=0, max_value=100, format="%.1f"),
-    },
-)
+# ════════════════════════════════════════════════════════════════════
+with tab1:
+    # Filters
+    fc1, fc2, fc3 = st.columns([2, 2, 2])
+    with fc1:
+        types = ["All"] + sorted(df["type"].dropna().unique().tolist()) if "type" in df.columns else ["All"]
+        sel_type = st.selectbox("Asset type", types)
+    with fc2:
+        sel_horizon = st.selectbox("Primary horizon", ["3M", "1M", "6M", "Score"])
+    with fc3:
+        min_score = st.slider("Min adjusted score", 0, 100, 30)
 
-# ── Bar chart: top 15 by selected horizon ──────────────────────────────────────
-st.subheader(f"Top 15 — {sort_horizon} probability")
+    filtered = df.copy()
+    if sel_type != "All" and "type" in filtered.columns:
+        filtered = filtered[filtered["type"] == sel_type]
+    filtered = filtered[filtered.get(adj_col, filtered.get("score", 0)) >= min_score]
+    sort_col = adj_col if sel_horizon == "Score" else f"prob_{sel_horizon}"
+    if sort_col in filtered.columns:
+        filtered = filtered.sort_values(sort_col, ascending=False)
 
-chart_col = "score" if sort_horizon == "Score" else f"prob_{sort_horizon}"
-if chart_col in filtered.columns:
+    # ── Top 3 cards ──────────────────────────────────────────────────────────
+    if not filtered.empty:
+        st.subheader("🏅 Top 3 Picks")
+        medals = ["🥇", "🥈", "🥉"]
+        flag_map = {"US Stock": "🇺🇸", "German Stock": "🇩🇪", "Crypto": "🪙"}
+        top3 = filtered.head(3)
+
+        for (medal, (_, row)) in zip(medals, top3.iterrows()):
+            adj     = row.get(adj_col) or 0
+            signal  = _signal(adj)
+            flag    = flag_map.get(row.get("type", ""), "📈")
+            name    = row.get("name", row["ticker"])
+            p1      = row.get("prob_1M") or 0
+            p3      = row.get("prob_3M") or 0
+            p6      = row.get("prob_6M") or 0
+
+            with st.container(border=True):
+                left, right = st.columns([3, 1])
+                with left:
+                    st.markdown(f"### {medal} {flag} {name} `{row['ticker']}`")
+                    st.markdown(f"**Signal: {signal}** &nbsp;|&nbsp; Adjusted Score: **{adj:.0f}**")
+                    prog_cols = st.columns(3)
+                    prog_cols[0].metric("1 Month", f"{p1:.0f}%", "target +5%")
+                    prog_cols[1].metric("3 Months", f"{p3:.0f}%", "target +10%")
+                    prog_cols[2].metric("6 Months", f"{p6:.0f}%", "target +15%")
+                with right:
+                    details = []
+                    fl = row.get("fund_label", "")
+                    fd = row.get("fund_display", "")
+                    if fl:  details.append(f"💼 **Company:** {fl}")
+                    if fd and fd != "N/A": details.append(f"_{fd}_")
+                    sl = row.get("sentiment_label", "")
+                    if sl:  details.append(f"📰 **News:** {sl}")
+                    al = row.get("analyst_label", "")
+                    if al:  details.append(f"🟢 **Analysts:** {al}")
+                    il = row.get("insider_label", "")
+                    if il:  details.append(f"🏢 **Insiders:** {il}")
+                    pl = row.get("pc_label", "")
+                    if pl:  details.append(f"📊 **Options:** {pl}")
+                    en = row.get("earnings_note", "")
+                    if en:  details.append(f"{en}")
+                    st.markdown("\n\n".join(details) if details else "_No additional signals_")
+
+        st.divider()
+
+    # ── Full ranked table ─────────────────────────────────────────────────────
+    st.subheader(f"📋 Full Rankings ({len(filtered)} assets)")
+
+    display_cols = ["name", "ticker", "type", "prob_1M", "prob_3M", "prob_6M",
+                    adj_col, "fund_label", "sentiment_label", "analyst_label"]
+    avail = [c for c in display_cols if c in filtered.columns]
+    table = filtered[avail].head(50).copy()
+    table[adj_col] = table[adj_col].fillna(0)
+
+    rename = {"name": "Name", "ticker": "Ticker", "type": "Type",
+              "prob_1M": "1M %", "prob_3M": "3M %", "prob_6M": "6M %",
+              adj_col: "Score", "fund_label": "Company Health",
+              "sentiment_label": "News", "analyst_label": "Analysts"}
+    table.rename(columns=rename, inplace=True)
+
+    col_cfg = {
+        "1M %":   st.column_config.ProgressColumn("1M %",   min_value=0, max_value=100, format="%.0f%%"),
+        "3M %":   st.column_config.ProgressColumn("3M %",   min_value=0, max_value=100, format="%.0f%%"),
+        "6M %":   st.column_config.ProgressColumn("6M %",   min_value=0, max_value=100, format="%.0f%%"),
+        "Score":  st.column_config.ProgressColumn("Score",  min_value=0, max_value=100, format="%.0f"),
+    }
+    st.dataframe(table, use_container_width=True, hide_index=True, column_config=col_cfg)
+
+# ════════════════════════════════════════════════════════════════════
+with tab2:
+    st.subheader("📊 Top 15 — Adjusted Score")
     chart_data = filtered.head(15).set_index(
-        "name" if "name" in filtered.columns else "ticker"
-    )[[chart_col]].rename(columns={chart_col: sort_horizon})
+        filtered.head(15).get("name", filtered.head(15)["ticker"])
+        if "name" in filtered.columns else filtered.head(15)["ticker"]
+    )[[adj_col]].rename(columns={adj_col: "Score"})
     st.bar_chart(chart_data)
 
-# ── By asset type breakdown ────────────────────────────────────────────────────
-if "type" in filtered.columns:
-    st.subheader("Breakdown by asset type")
-    type_cols = st.columns(3)
-    for i, atype in enumerate(["US Stock", "German Stock", "Crypto"]):
-        subset = filtered[filtered["type"] == atype].head(5)
-        with type_cols[i]:
-            st.markdown(f"**{atype}**")
-            if subset.empty:
-                st.caption("No results.")
-            else:
-                label_col = "name" if "name" in subset.columns else "ticker"
-                for _, row in subset.iterrows():
-                    p3 = row.get("prob_3M", 0)
-                    st.markdown(f"- **{row[label_col]}** — {p3:.1f}% (3M)")
+    st.subheader("🌐 Signal Distribution by Asset Type")
+    if "type" in filtered.columns:
+        type_cols = st.columns(3)
+        for i, atype in enumerate(["US Stock", "German Stock", "Crypto"]):
+            sub = filtered[filtered["type"] == atype].head(8)
+            with type_cols[i]:
+                st.markdown(f"**{atype}**")
+                if sub.empty:
+                    st.caption("No results")
+                else:
+                    for _, r in sub.iterrows():
+                        adj = r.get(adj_col) or 0
+                        sig = "🔥" if adj >= 65 else ("✅" if adj >= 55 else "👀")
+                        p3  = r.get("prob_3M") or 0
+                        nm  = r.get("name", r["ticker"])
+                        st.markdown(f"{sig} **{nm}** — {p3:.0f}% (3M)")
 
-st.divider()
+    st.subheader("📈 Probability Distribution")
+    if "prob_3M" in filtered.columns:
+        hist_data = filtered["prob_3M"].dropna()
+        st.bar_chart(hist_data.value_counts(bins=10).sort_index())
 
-# ── Model accuracy tracking ────────────────────────────────────────────────────
-st.subheader("📐 Model Accuracy (live tracking)")
-st.caption("Compares past predictions against what actually happened. Fills in automatically after each horizon passes.")
+# ════════════════════════════════════════════════════════════════════
+with tab3:
+    st.subheader("📐 Model Accuracy Tracking")
+    st.caption("Fills in automatically as each prediction's horizon passes (1 / 3 / 6 months after the prediction date).")
 
-try:
-    import sqlite3 as _sql
-    _conn = _sql.connect("results.db")
-    _acc = _sql.connect("results.db").execute("""
-        SELECT
-            SUM(CASE WHEN hit_1M IS NOT NULL THEN 1 ELSE 0 END) as n_1M,
-            ROUND(AVG(CASE WHEN hit_1M IS NOT NULL THEN hit_1M END)*100,1) as acc_1M,
-            SUM(CASE WHEN hit_3M IS NOT NULL THEN 1 ELSE 0 END) as n_3M,
-            ROUND(AVG(CASE WHEN hit_3M IS NOT NULL THEN hit_3M END)*100,1) as acc_3M,
-            SUM(CASE WHEN hit_6M IS NOT NULL THEN 1 ELSE 0 END) as n_6M,
-            ROUND(AVG(CASE WHEN hit_6M IS NOT NULL THEN hit_6M END)*100,1) as acc_6M
-        FROM outcome_tracking
-    """).fetchone()
-    _conn.close()
+    acc_row, acc_hist = load_accuracy()
 
-    if _acc and _acc[0]:
-        a1, a2, a3 = st.columns(3)
-        with a1:
-            st.metric("1-Month accuracy", f"{_acc[1] or 0:.1f}%", f"{_acc[0]} predictions resolved")
-        with a2:
-            st.metric("3-Month accuracy", f"{_acc[3] or 0:.1f}%", f"{_acc[2]} predictions resolved")
-        with a3:
-            st.metric("6-Month accuracy", f"{_acc[5] or 0:.1f}%", f"{_acc[4]} predictions resolved")
+    if acc_row and acc_row[0]:
+        m1, m2, m3 = st.columns(3)
+        m1.metric("1-Month accuracy", f"{acc_row[1] or 0:.1f}%",
+                  f"{int(acc_row[0])} predictions resolved",
+                  help="% of predictions where the stock actually gained ≥5% in 1 month")
+        m2.metric("3-Month accuracy", f"{acc_row[3] or 0:.1f}%",
+                  f"{int(acc_row[2])} predictions resolved",
+                  help="% of predictions where the stock gained ≥10% in 3 months")
+        m3.metric("6-Month accuracy", f"{acc_row[5] or 0:.1f}%",
+                  f"{int(acc_row[4])} predictions resolved",
+                  help="% of predictions where the stock gained ≥15% in 6 months")
 
-        _hist = __import__("pandas").read_sql("""
-            SELECT prediction_date, ticker,
-                   prob_3M, return_3M, hit_3M
-            FROM outcome_tracking
-            WHERE hit_3M IS NOT NULL
-            ORDER BY prediction_date DESC
-            LIMIT 50
-        """, __import__("sqlite3").connect("results.db"))
-        if not _hist.empty:
-            st.dataframe(_hist, use_container_width=True, hide_index=True)
+        if not acc_hist.empty:
+            st.dataframe(acc_hist, use_container_width=True, hide_index=True)
     else:
-        st.info("No resolved predictions yet — accuracy data appears after the first horizon (1 month) passes.")
-except Exception:
-    st.info("Accuracy tracking will appear after the first month of predictions.")
+        st.info("📅 Accuracy data appears after the first horizon passes (1 month from today). "
+                "Come back in a month to see how well the model performed!")
 
 st.divider()
-st.caption("Not financial advice. Predictions are statistical estimates based on historical patterns.")
+st.caption("⚠️ Not financial advice. Predictions are AI-generated estimates based on historical patterns. Always do your own research.")

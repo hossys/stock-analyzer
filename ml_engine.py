@@ -5,6 +5,7 @@ import pandas as pd
 import lightgbm as lgb
 import xgboost as xgb
 from pathlib import Path
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
 
@@ -102,22 +103,41 @@ def train_models(
         mean_auc = np.mean(aucs) if aucs else 0.0
         print(f"[{label}] Walk-forward AUC: {mean_auc:.3f} ± {np.std(aucs):.3f}")
 
-        # Train final LightGBM + XGBoost on full dataset
+        # ── Stacking: generate out-of-fold predictions for meta-learner ──────
+        tscv_stack = TimeSeriesSplit(n_splits=3)
+        lgb_oof = np.zeros(len(y))
+        xgb_oof = np.zeros(len(y))
+        for tr_idx, vl_idx in tscv_stack.split(X):
+            X_tr, X_vl = X.iloc[tr_idx], X.iloc[vl_idx]
+            y_tr = y.iloc[tr_idx]
+            pos_tr = int(y_tr.sum()); neg_tr = int(len(y_tr) - pos_tr)
+            m_lgb = lgb.LGBMClassifier(**_LGB_PARAMS)
+            m_lgb.fit(X_tr, y_tr)
+            lgb_oof[vl_idx] = m_lgb.predict_proba(X_vl)[:, 1]
+            m_xgb = xgb.XGBClassifier(**_xgb_params(pos_tr, neg_tr))
+            m_xgb.fit(X_tr, y_tr)
+            xgb_oof[vl_idx] = m_xgb.predict_proba(X_vl)[:, 1]
+
+        meta = LogisticRegression(random_state=42, max_iter=500)
+        meta.fit(np.column_stack([lgb_oof, xgb_oof]), y)
+        meta_auc = roc_auc_score(y, meta.predict_proba(
+            np.column_stack([lgb_oof, xgb_oof]))[:, 1])
+        print(f"[{label}] Stacking meta AUC (OOF): {meta_auc:.3f}")
+
+        # ── Final base models trained on all data ─────────────────────────
         lgb_model = lgb.LGBMClassifier(**_LGB_PARAMS)
         lgb_model.fit(X, y)
-
         xgb_model = xgb.XGBClassifier(**_xgb_params(pos, neg))
         xgb_model.fit(X, y)
 
-        # Feature importance from LightGBM
         importance = pd.Series(lgb_model.feature_importances_, index=FEATURE_COLS)
         top5 = importance.nlargest(5).index.tolist()
         print(f"[{label}] Top features: {', '.join(top5)}")
 
-        ensemble = {"lgb": lgb_model, "xgb": xgb_model}
+        ensemble = {"lgb": lgb_model, "xgb": xgb_model, "meta": meta}
         path = os.path.join(MODEL_DIR, f"model_{label}.pkl")
         joblib.dump(ensemble, path)
-        print(f"[{label}] Ensemble saved to {path}")
+        print(f"[{label}] Stacked ensemble saved to {path}")
         models[label] = ensemble
 
     return models
@@ -158,7 +178,12 @@ def predict(
             try:
                 lgb_p = ensemble["lgb"].predict_proba(latest)[0][1]
                 xgb_p = ensemble["xgb"].predict_proba(latest)[0][1]
-                prob = (lgb_p + xgb_p) / 2
+                if "meta" in ensemble:
+                    import numpy as _np
+                    prob = ensemble["meta"].predict_proba(
+                        _np.column_stack([[lgb_p], [xgb_p]]))[0][1]
+                else:
+                    prob = (lgb_p + xgb_p) / 2
                 row[f"prob_{label}"] = round(prob * 100, 1)
             except Exception:
                 row[f"prob_{label}"] = None
