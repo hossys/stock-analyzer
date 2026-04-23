@@ -8,127 +8,168 @@ from datetime import datetime
 import pandas as pd
 
 from config import (
-    US_STOCKS, DE_STOCKS, CRYPTO,
+    US_STOCKS, DE_STOCKS, CRYPTO, SECTOR_MAP,
     TICKER_NAMES, DB_PATH, TOP_N, DAILY_RUN_TIME,
 )
 from data_fetcher import fetch_all
-from feature_engine import compute_features
-from ml_engine import train_models, load_models, predict
+from feature_engine import compute_features, FEATURE_COLS
+from ml_engine import train_models, load_models, predict, feature_count_matches
+from macro_features import fetch_macro, build_macro_df
 from fundamental import fetch_all_fundamentals, score_fundamentals
 from sentiment import get_all_sentiments
+from insider import get_all_insider_signals
+from earnings import get_all_earnings
 from market_regime import detect_regime, compute_sector_momentum, sector_boost
 from outcome_tracker import save_prediction_prices, update_outcomes
 from notifier import send_daily_digest
 
 
 def _asset_type(ticker: str) -> str:
-    if ticker in US_STOCKS:
-        return "US Stock"
-    if ticker in DE_STOCKS:
-        return "German Stock"
+    if ticker in US_STOCKS:   return "US Stock"
+    if ticker in DE_STOCKS:   return "German Stock"
     return "Crypto"
 
 
-def _build_features(data: dict) -> tuple[dict, dict]:
+def _benchmark_for(ticker: str, prices: dict) -> pd.Series | None:
+    """Return the benchmark price series for computing relative strength."""
+    etf = SECTOR_MAP.get(ticker)
+    if etf and etf in prices:
+        return prices[etf]
+    if ticker in DE_STOCKS and "EWG" in prices:
+        return prices["EWG"]
+    if ticker in CRYPTO and "BTC-USD" in prices and ticker != "BTC-USD":
+        return prices["BTC-USD"]
+    return None
+
+
+def _build_features(data: dict, macro_data: dict) -> tuple[dict, dict]:
     features, prices = {}, {}
+    all_dates = pd.DatetimeIndex(sorted(set().union(*[df.index for df in data.values()])))
+    macro_df = build_macro_df(macro_data, all_dates)
+
     for ticker, df in data.items():
         try:
-            features[ticker] = compute_features(df)
+            feat = compute_features(df)
+
+            # Inject macro features (aligned by date)
+            for col in ["vix_level", "vix_chg_10d", "yield_10y", "yield_chg_20d", "dollar_chg_20d"]:
+                if col in macro_df.columns:
+                    feat[col] = macro_df[col].reindex(feat.index, method="ffill")
+
+            features[ticker] = feat
             prices[ticker] = df["Close"].squeeze()
         except Exception as e:
             print(f"  [{ticker}] feature error: {e}")
+
+    # Relative strength vs sector (vectorized per ticker)
+    for ticker, feat in features.items():
+        bench = _benchmark_for(ticker, prices)
+        stock = prices.get(ticker)
+        if bench is not None and stock is not None:
+            bench_aligned = bench.reindex(stock.index, method="ffill")
+            rs20 = stock.pct_change(20) - bench_aligned.pct_change(20)
+            rs60 = stock.pct_change(60) - bench_aligned.pct_change(60)
+            feat["rs_20d"] = rs20.reindex(feat.index, method="ffill")
+            feat["rs_60d"] = rs60.reindex(feat.index, method="ffill")
+
     return features, prices
 
 
-def _apply_boosts(
-    predictions: pd.DataFrame,
-    fundamentals: dict,
-    sentiments: dict,
-    sector_mom: dict,
-    regime: dict,
-) -> pd.DataFrame:
-    fund_scores, fund_labels, fund_displays = [], [], []
-    sent_boosts, sent_labels = [], []
-    sec_boosts = []
+def _apply_boosts(predictions, fundamentals, sentiments, insiders, earnings_data,
+                  sector_mom, regime) -> pd.DataFrame:
+    predictions = predictions.copy()
+    cols = {
+        "fund_score": [], "fund_label": [], "fund_display": [],
+        "sent_boost": [], "sentiment_label": [],
+        "insider_boost": [], "insider_label": [],
+        "sector_boost_val": [],
+        "earnings_warning": [], "earnings_note": [],
+    }
 
     for _, row in predictions.iterrows():
-        ticker = row["ticker"]
+        t = row["ticker"]
 
-        f_score, f_label, f_display = score_fundamentals(fundamentals.get(ticker, {}))
-        fund_scores.append(f_score)
-        fund_labels.append(f_label)
-        fund_displays.append(f_display)
+        fs, fl, fd = score_fundamentals(fundamentals.get(t, {}))
+        cols["fund_score"].append(fs)
+        cols["fund_label"].append(fl)
+        cols["fund_display"].append(fd)
 
-        s = sentiments.get(ticker, {})
-        sent_boosts.append(s.get("sentiment_boost", 0.0))
-        sent_labels.append(s.get("sentiment_label", "Neutral 😐"))
+        s = sentiments.get(t, {})
+        cols["sent_boost"].append(s.get("sentiment_boost", 0.0))
+        cols["sentiment_label"].append(s.get("sentiment_label", "Neutral 😐"))
 
-        sec_boosts.append(sector_boost(ticker, sector_mom))
+        ins = insiders.get(t, {})
+        cols["insider_boost"].append(ins.get("insider_boost", 0.0))
+        cols["insider_label"].append(ins.get("insider_label", ""))
 
-    predictions = predictions.copy()
-    predictions["fund_score"]   = fund_scores
-    predictions["fund_label"]   = fund_labels
-    predictions["fund_display"] = fund_displays
-    predictions["sent_boost"]   = sent_boosts
-    predictions["sentiment_label"] = sent_labels
-    predictions["sector_boost"] = sec_boosts
+        cols["sector_boost_val"].append(sector_boost(t, sector_mom))
 
-    raw = predictions["score"] + predictions["fund_score"] + \
-          predictions["sent_boost"] + predictions["sector_boost"]
+        earn = earnings_data.get(t, {})
+        cols["earnings_warning"].append(earn.get("earnings_warning", False))
+        cols["earnings_note"].append(earn.get("earnings_note", ""))
+
+    for k, v in cols.items():
+        predictions[k] = v
+
+    raw = (
+        predictions["score"]
+        + predictions["fund_score"]
+        + predictions["sent_boost"]
+        + predictions["insider_boost"]
+        + predictions["sector_boost_val"]
+    )
+    # Reduce score by 30% during earnings uncertainty
+    earnings_penalty = predictions["earnings_warning"].map({True: 0.70, False: 1.0})
     multiplier = regime.get("score_multiplier", 1.0)
-    predictions["adj_score"] = (raw * multiplier).round(1)
+    predictions["adj_score"] = (raw * multiplier * earnings_penalty).round(1)
     predictions.sort_values("adj_score", ascending=False, inplace=True)
     predictions.reset_index(drop=True, inplace=True)
     return predictions
 
 
-def _models_exist() -> bool:
-    return os.path.exists(os.path.join("models", "model_3M.pkl"))
-
-
 def _should_retrain() -> bool:
-    if not _models_exist():
+    if not feature_count_matches():
+        print("  Feature set changed — retraining.")
         return True
-    return datetime.now().weekday() == 0
+    return datetime.now().weekday() == 0   # every Monday
 
 
 def _save(predictions: pd.DataFrame):
     conn = sqlite3.connect(DB_PATH)
     df = predictions.copy()
     df["timestamp"] = datetime.now().strftime("%Y-%m-%d")
-    df.to_sql("predictions", conn, if_exists="append", index=False)
+    try:
+        df.to_sql("predictions", conn, if_exists="append", index=False)
+    except Exception:
+        conn.execute("DROP TABLE IF EXISTS predictions")
+        df.to_sql("predictions", conn, if_exists="replace", index=False)
     conn.close()
 
 
 def _print_results(predictions: pd.DataFrame, regime: dict):
-    is_bull = regime.get("is_bull", True)
-    print(f"\n  Market: {regime.get('regime', '?')} | "
+    print(f"\n  Market: {regime.get('regime','?')} | "
           f"S&P vs 200MA: {regime.get('spy_vs_200ma', 0):+.1f}%")
-    print(f"\n{'─'*75}")
-    print(f"{'#':<4} {'Name':<20} {'Type':<14} {'1M':>6} {'3M':>6} {'6M':>6} "
-          f"{'Base':>6} {'Adj':>6} {'Signal':<18}")
-    print(f"{'─'*75}")
+    print(f"\n{'─'*78}")
+    print(f"{'#':<4} {'Name':<20} {'Type':<14} {'1M':>5} {'3M':>5} {'6M':>5} "
+          f"{'Base':>5} {'Adj':>5}  Signal")
+    print(f"{'─'*78}")
     for rank, (_, row) in enumerate(predictions.head(TOP_N).iterrows(), 1):
-        ticker = row["ticker"]
-        name = TICKER_NAMES.get(ticker, ticker)[:18]
-        p1 = f"{row.get('prob_1M', 0):.0f}%"
-        p3 = f"{row.get('prob_3M', 0):.0f}%"
-        p6 = f"{row.get('prob_6M', 0):.0f}%"
-        base = f"{row.get('score', 0):.0f}"
-        adj = f"{row.get('adj_score', 0):.0f}"
-        adj_val = row.get("adj_score", 0)
-        if adj_val >= 65:
-            sig = "🔥 STRONG BUY"
-        elif adj_val >= 55:
-            sig = "✅ BUY"
-        else:
-            sig = "👀 WATCH"
+        name = TICKER_NAMES.get(row["ticker"], row["ticker"])[:18]
+        p1   = f"{row.get('prob_1M') or 0:.0f}%"
+        p3   = f"{row.get('prob_3M') or 0:.0f}%"
+        p6   = f"{row.get('prob_6M') or 0:.0f}%"
+        base = f"{row.get('score') or 0:.0f}"
+        adj  = f"{row.get('adj_score') or 0:.0f}"
+        adj_val = row.get("adj_score") or 0
+        sig  = "🔥 STRONG BUY" if adj_val >= 65 else ("✅ BUY" if adj_val >= 55 else "👀 WATCH")
+        warn = " ⚡earnings" if row.get("earnings_warning") else ""
+        ins  = f" {row.get('insider_label','')}" if row.get("insider_label") else ""
         print(f"{rank:<4} {name:<20} {row.get('type',''):<14} "
-              f"{p1:>6} {p3:>6} {p6:>6} {base:>6} {adj:>6} {sig}")
-    print(f"{'─'*75}")
-    print("1M/3M/6M = probability of gaining ≥5%/10%/15% | Adj = score after all boosts")
-    if not is_bull:
-        print("⚠️  Bear market detected — scores reduced by 30%")
+              f"{p1:>5} {p3:>5} {p6:>5} {base:>5} {adj:>5}  {sig}{warn}{ins}")
+    print(f"{'─'*78}")
+    print("1M/3M/6M = P(gain ≥5%/10%/15%) | Adj = after macro+fundamentals+sentiment+insider boosts")
+    if not regime.get("is_bull", True):
+        print("⚠️  Bear market — all scores reduced 30%")
 
 
 def run():
@@ -136,47 +177,56 @@ def run():
     print(f"  Stock Analyzer — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'='*65}")
 
-    print("\n[1/7] Detecting market regime...")
+    print("\n[1/8] Detecting market regime...")
     regime = detect_regime()
     print(f"  {regime['regime']} | S&P vs 200MA: {regime['spy_vs_200ma']:+.1f}%")
 
-    print("\n[2/7] Fetching market data...")
+    print("\n[2/8] Fetching market + macro data...")
     data = fetch_all()
+    macro_data = fetch_macro()
     if not data:
         print("No data fetched. Aborting.")
         return
 
-    print("\n[3/7] Computing features...")
-    features, prices = _build_features(data)
-    print(f"  Features ready for {len(features)} assets.")
+    print("\n[3/8] Computing features (technical + macro + relative strength)...")
+    features, prices = _build_features(data, macro_data)
+    print(f"  Features ready for {len(features)} assets ({len(FEATURE_COLS)} features each).")
 
     if _should_retrain():
-        print("\n[4/7] Training ML ensemble (LightGBM + XGBoost)...")
+        print("\n[4/8] Training LightGBM + XGBoost ensemble...")
         models = train_models(features, prices)
     else:
-        print("\n[4/7] Loading existing ML models...")
+        print("\n[4/8] Loading existing ML models...")
         models = load_models()
 
     if not models:
         print("No models available. Aborting.")
         return
 
-    print("\n[5/7] Generating ML predictions...")
+    print("\n[5/8] Generating ML predictions...")
     predictions = predict(models, features)
     predictions["type"] = predictions["ticker"].apply(_asset_type)
     predictions["name"] = predictions["ticker"].map(TICKER_NAMES).fillna(predictions["ticker"])
 
     tickers = predictions["ticker"].tolist()
 
-    print("\n[6/7] Fetching fundamentals & news sentiment...")
+    print("\n[6/8] Fetching fundamentals, sentiment & sector momentum...")
     fundamentals = fetch_all_fundamentals(tickers)
-    sentiments = get_all_sentiments(tickers)
-    sector_mom = compute_sector_momentum()
+    sentiments   = get_all_sentiments(tickers)
+    sector_mom   = compute_sector_momentum()
 
-    predictions = _apply_boosts(predictions, fundamentals, sentiments, sector_mom, regime)
+    print("\n[7/8] Fetching insider signals & earnings calendar...")
+    insiders      = get_all_insider_signals(tickers)
+    earnings_data = get_all_earnings(tickers)
 
-    print("\n[7/7] Saving results & sending Telegram...")
-    current_prices = {t: float(prices[t].iloc[-1]) for t in prices if t in predictions["ticker"].values}
+    predictions = _apply_boosts(
+        predictions, fundamentals, sentiments, insiders,
+        earnings_data, sector_mom, regime,
+    )
+
+    print("\n[8/8] Saving results & sending Telegram...")
+    current_prices = {t: float(prices[t].iloc[-1]) for t in prices
+                      if t in predictions["ticker"].values}
     save_prediction_prices(predictions, current_prices)
     update_outcomes()
     _save(predictions)

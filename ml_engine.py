@@ -132,6 +132,18 @@ def load_models() -> dict:
     return models
 
 
+def feature_count_matches() -> bool:
+    """Check if saved models were trained on the current feature set."""
+    path = os.path.join(MODEL_DIR, "model_3M.pkl")
+    if not os.path.exists(path):
+        return False
+    try:
+        ensemble = joblib.load(path)
+        return ensemble["lgb"].n_features_in_ == len(FEATURE_COLS)
+    except Exception:
+        return False
+
+
 def predict(
     models: dict,
     features_by_ticker: dict[str, pd.DataFrame],

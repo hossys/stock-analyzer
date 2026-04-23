@@ -6,17 +6,27 @@ from ta.volatility import BollingerBands, AverageTrueRange
 from ta.volume import OnBalanceVolumeIndicator
 
 FEATURE_COLS = [
+    # Price momentum
     "ret_1d", "ret_5d", "ret_20d", "ret_60d",
+    # Oscillators
     "rsi_9", "rsi_14", "rsi_21",
     "macd_diff", "macd_signal", "macd_line",
     "bb_pct", "bb_width",
+    # Trend
     "price_vs_ema20", "price_vs_ema50", "price_vs_ema200",
     "ema20_vs_ema50", "ema50_vs_ema200",
+    # Volatility / volume
     "atr_pct", "stoch", "adx",
     "volume_ratio", "obv_slope",
     "roc_10", "roc_20",
+    # Range
     "high_52w_ratio", "low_52w_ratio",
+    # Seasonality
     "month", "day_of_week",
+    # Macro (filled in main.py from macro_features)
+    "vix_level", "vix_chg_10d", "yield_10y", "yield_chg_20d", "dollar_chg_20d",
+    # Relative strength vs sector (filled in main.py)
+    "rs_20d", "rs_60d",
 ]
 
 
@@ -85,5 +95,10 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     # Seasonality
     f["month"] = df.index.month.astype(float)
     f["day_of_week"] = df.index.dayofweek.astype(float)
+
+    # Macro + relative strength — zeroed here, filled in main.py after all data is loaded
+    for col in ["vix_level", "vix_chg_10d", "yield_10y", "yield_chg_20d",
+                "dollar_chg_20d", "rs_20d", "rs_60d"]:
+        f[col] = 0.0
 
     return f[FEATURE_COLS]

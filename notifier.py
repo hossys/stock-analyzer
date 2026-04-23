@@ -84,6 +84,12 @@ def send_daily_digest(predictions: pd.DataFrame, regime: dict):
             lines.append(f"   💼 Fundamentals: {fund_label} — {fund_display}")
         if sent_label:
             lines.append(f"   📰 News sentiment: {sent_label}")
+        insider_label = row.get("insider_label", "")
+        if insider_label:
+            lines.append(f"   🏢 Insider activity: {insider_label}")
+        earnings_note = row.get("earnings_note", "")
+        if earnings_note:
+            lines.append(f"   {earnings_note}")
 
     lines += [
         f"",
