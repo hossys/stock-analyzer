@@ -5,17 +5,94 @@ import pandas as pd
 
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TICKER_NAMES, TOP_N
 
-_TYPE_FLAG = {"US Stock": "🇺🇸", "German Stock": "🇩🇪", "Crypto": "🪙"}
+_FLAG  = {"US Stock": "🇺🇸", "German Stock": "🇩🇪", "Crypto": "🪙"}
+_MEDAL = {1: "🥇", 2: "🥈", 3: "🥉"}
 
 
-def _signal(adj_score: float, is_bull: bool) -> str:
+def _signal_text(adj_score: float, is_bull: bool) -> str:
     if not is_bull and adj_score < 55:
-        return "⚠️ CAUTION (bear market)"
+        return "⚠️ RISKY — Bear Market"
     if adj_score >= 65:
         return "🔥 STRONG BUY"
     if adj_score >= 55:
         return "✅ BUY"
     return "👀 WATCH"
+
+
+def _market_summary(regime: dict) -> str:
+    is_bull   = regime.get("is_bull", True)
+    spy_dist  = regime.get("spy_vs_200ma", 0)
+    direction = "above" if spy_dist >= 0 else "below"
+
+    if is_bull:
+        mood = "Healthy & Growing 🟢"
+        note = "Good conditions for buying stocks."
+    else:
+        mood = "Weak / Declining 🔴"
+        note = "⚠️ Be careful — the overall market is in a downtrend. Consider smaller positions."
+
+    return (
+        f"🌍 *Market Status:* {mood}\n"
+        f"The S&P 500 is *{abs(spy_dist):.1f}%* {direction} its long-term average.\n"
+        f"_{note}_"
+    )
+
+
+def _stock_block(rank: int, row: pd.Series) -> str:
+    ticker    = row["ticker"]
+    name      = TICKER_NAMES.get(ticker, ticker)
+    flag      = _FLAG.get(row.get("type", ""), "📈")
+    medal     = _MEDAL.get(rank, f"{rank}.")
+    adj       = row.get("adj_score") or 0
+    signal    = _signal_text(adj, True)
+
+    p1 = row.get("prob_1M") or 0
+    p3 = row.get("prob_3M") or 0
+    p6 = row.get("prob_6M") or 0
+
+    fund_label   = row.get("fund_label", "")
+    sent_label   = row.get("sentiment_label", "")
+    insider      = row.get("insider_label", "")
+    earn_note    = row.get("earnings_note", "")
+
+    lines = [
+        f"{medal} {flag} *{name}* (`{ticker}`)",
+        f"Signal: *{signal}*",
+        f"",
+        f"📈 *How likely is it to rise?*",
+        f"  • In 1 month  → *{p1:.0f}%* chance of gaining ≥5%",
+        f"  • In 3 months → *{p3:.0f}%* chance of gaining ≥10%",
+        f"  • In 6 months → *{p6:.0f}%* chance of gaining ≥15%",
+    ]
+
+    if fund_label:
+        lines += [f"", f"💼 *Company health:* {fund_label}"]
+
+    if sent_label:
+        lines.append(f"📰 *News mood:* {sent_label}")
+
+    if insider:
+        lines.append(f"🏢 *Insider activity:* {insider}")
+
+    if earn_note:
+        lines.append(f"{earn_note}")
+
+    return "\n".join(lines)
+
+
+def _hints_block() -> str:
+    return (
+        "💡 *Quick Guide*\n"
+        "  🔥 STRONG BUY = All signals align — high confidence\n"
+        "  ✅ BUY = Good opportunity\n"
+        "  👀 WATCH = Interesting but not ideal timing yet\n"
+        "  % = AI's estimated probability of reaching that gain\n"
+        "  💼 Company health = Based on profit, growth & debt\n"
+        "  📰 News mood = Recent headlines analyzed by AI\n"
+        "  🏢 Insider activity = Are company executives buying or selling?\n"
+        "  ⚡ Earnings = Company reports results soon → more volatile, higher risk\n"
+        "  🇺🇸 = US stock  |  🇩🇪 = German stock  |  🪙 = Crypto"
+    )
 
 
 def _send(text: str):
@@ -36,73 +113,60 @@ def _send(text: str):
 
 
 def send_daily_digest(predictions: pd.DataFrame, regime: dict):
-    today = datetime.now().strftime("%B %d, %Y")
+    today   = datetime.now().strftime("%B %d, %Y")
     is_bull = regime.get("is_bull", True)
-    regime_str = regime.get("regime", "UNKNOWN")
-    spy_dist = regime.get("spy_vs_200ma", 0)
-    spy_line = f"S&P 500 is *{abs(spy_dist):.1f}%* {'above' if spy_dist >= 0 else 'below'} its 200-day average"
+    top     = predictions.head(TOP_N)
 
-    lines = [
-        f"📊 *Stock Analyzer — {today}*",
+    # ── Header ───────────────────────────────────────────────────────────────
+    parts = [
+        f"📊 *Your Daily Stock Picks*",
+        f"📅 {today}",
         f"",
-        f"🌍 *Market:* {regime_str}",
-        f"   {spy_line}",
-        f"{'   ⚠️ Bear market: all scores reduced — buy carefully.' if not is_bull else ''}",
+        f"{'─' * 28}",
+        _market_summary(regime),
+        f"{'─' * 28}",
         f"",
-        f"━━━━━━━━━━━━━━━━━━━━━━━━",
         f"🏆 *TOP PICKS TODAY*",
-        f"━━━━━━━━━━━━━━━━━━━━━━━━",
-    ]
-
-    top = predictions.head(TOP_N)
-    for rank, (_, row) in enumerate(top.iterrows(), 1):
-        ticker = row["ticker"]
-        name = TICKER_NAMES.get(ticker, ticker)
-        flag = _TYPE_FLAG.get(row.get("type", ""), "📈")
-        adj = row.get("adj_score", row.get("score", 0))
-        signal = _signal(adj, is_bull)
-
-        p1 = row.get("prob_1M", "—")
-        p3 = row.get("prob_3M", "—")
-        p6 = row.get("prob_6M", "—")
-
-        fund_label = row.get("fund_label", "")
-        fund_display = row.get("fund_display", "")
-        sent_label = row.get("sentiment_label", "")
-
-        medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, f"{rank}.")
-
-        lines += [
-            f"",
-            f"{medal} {flag} *{name}* (`{ticker}`)",
-            f"   Signal: *{signal}*",
-            f"   📈 Gain ≥5%  in 1 month:  *{p1}%*",
-            f"   📈 Gain ≥10% in 3 months: *{p3}%*",
-            f"   📈 Gain ≥15% in 6 months: *{p6}%*",
-        ]
-        if fund_label:
-            lines.append(f"   💼 Fundamentals: {fund_label} — {fund_display}")
-        if sent_label:
-            lines.append(f"   📰 News sentiment: {sent_label}")
-        insider_label = row.get("insider_label", "")
-        if insider_label:
-            lines.append(f"   🏢 Insider activity: {insider_label}")
-        earnings_note = row.get("earnings_note", "")
-        if earnings_note:
-            lines.append(f"   {earnings_note}")
-
-    lines += [
         f"",
-        f"━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"_Probabilities = ML estimate based on 5 years of historical data._",
-        f"_Not financial advice. Always do your own research._",
     ]
 
-    # Telegram has a 4096 char limit — split if needed
-    message = "\n".join(lines)
-    if len(message) > 4000:
-        # Send top 7 only if too long
-        send_daily_digest(predictions.head(7), regime)
-        return
+    # ── Top 5 full detail ────────────────────────────────────────────────────
+    full_detail = top.head(5)
+    for rank, (_, row) in enumerate(full_detail.iterrows(), 1):
+        parts.append(_stock_block(rank, row))
+        parts.append("")
 
-    _send(message)
+    # ── Ranks 6-15 brief ─────────────────────────────────────────────────────
+    rest = top.iloc[5:]
+    if not rest.empty:
+        parts.append(f"{'─' * 28}")
+        parts.append("*Also worth watching:*")
+        for rank, (_, row) in enumerate(rest.iterrows(), 6):
+            ticker = row["ticker"]
+            name   = TICKER_NAMES.get(ticker, ticker)
+            flag   = _FLAG.get(row.get("type", ""), "📈")
+            p3     = row.get("prob_3M") or 0
+            adj    = row.get("adj_score") or 0
+            sig    = "🔥" if adj >= 65 else ("✅" if adj >= 55 else "👀")
+            parts.append(f"  {rank}. {flag} *{name}* — 3M: {p3:.0f}% {sig}")
+        parts.append("")
+
+    # ── Hints + disclaimer ───────────────────────────────────────────────────
+    parts += [
+        f"{'─' * 28}",
+        _hints_block(),
+        f"",
+        f"{'─' * 28}",
+        f"_⚠️ This is AI-generated analysis, not financial advice._",
+        f"_Always do your own research before investing._",
+    ]
+
+    message = "\n".join(parts)
+
+    # Telegram 4096 char limit — split into two messages if needed
+    if len(message) <= 4090:
+        _send(message)
+    else:
+        mid = message.rfind("\n", 0, 4090)
+        _send(message[:mid])
+        _send(message[mid:])
