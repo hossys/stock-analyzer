@@ -65,3 +65,19 @@ DB_PATH = "results.db"
 TOP_N = 15
 MIN_DATA_ROWS = 300
 DAILY_RUN_TIME = "07:00"
+
+SECTOR_MAP = {
+    "AAPL": "XLK", "MSFT": "XLK", "NVDA": "XLK", "AVGO": "XLK", "ADBE": "XLK",
+    "CRM": "XLK",  "ORCL": "XLK", "CSCO": "XLK", "QCOM": "XLK", "TXN": "XLK",
+    "INTU": "XLK", "AMD":  "XLK",
+    "GOOGL": "XLC", "META": "XLC", "NFLX": "XLC",
+    "AMZN": "XLY", "TSLA": "XLY", "HD": "XLY", "BKNG": "XLY", "UBER": "XLY",
+    "JPM": "XLF",  "V": "XLF",   "MA": "XLF",  "BAC": "XLF",  "PYPL": "XLF",
+    "COIN": "XLF",
+    "UNH": "XLV",  "LLY": "XLV", "JNJ": "XLV", "MRK": "XLV",  "TMO": "XLV",
+    "ABBV": "XLV", "AMGN": "XLV",
+    "PG": "XLP",   "KO": "XLP",  "PEP": "XLP", "COST": "XLP", "WMT": "XLP",
+    "XOM": "XLE",  "CVX": "XLE",
+}
+
+SECTOR_ETFS = ["XLK", "XLC", "XLY", "XLF", "XLV", "XLP", "XLE", "XLI", "EWG"]

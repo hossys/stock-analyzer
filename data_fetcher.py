@@ -1,6 +1,4 @@
-import os
 import pickle
-import time
 from datetime import date
 from pathlib import Path
 
@@ -11,48 +9,66 @@ from config import US_STOCKS, DE_STOCKS, CRYPTO, DATA_PERIOD, CACHE_DIR, MIN_DAT
 
 Path(CACHE_DIR).mkdir(exist_ok=True)
 
+_GROUPS = [
+    ("US Stocks",      US_STOCKS),
+    ("German Stocks",  DE_STOCKS),
+    ("Crypto",         CRYPTO),
+]
 
-def _cache_path(ticker: str) -> Path:
-    return Path(CACHE_DIR) / f"{ticker}_{date.today()}.pkl"
+
+def _cache_path(group_name: str) -> Path:
+    return Path(CACHE_DIR) / f"batch_{group_name.replace(' ', '_')}_{date.today()}.pkl"
 
 
 def _clean_old_cache():
     today = str(date.today())
-    for f in Path(CACHE_DIR).glob("*.pkl"):
+    for f in Path(CACHE_DIR).glob("batch_*.pkl"):
         if today not in f.name:
             f.unlink(missing_ok=True)
 
 
-def _download(ticker: str) -> pd.DataFrame | None:
-    cache = _cache_path(ticker)
+def _download_group(name: str, tickers: list[str]) -> dict[str, pd.DataFrame]:
+    cache = _cache_path(name)
     if cache.exists():
+        print(f"  {name}: loaded from cache.")
         return pickle.load(open(cache, "rb"))
 
+    print(f"  {name}: downloading {len(tickers)} tickers...", end="\r")
     try:
-        df = yf.download(ticker, period=DATA_PERIOD, interval="1d",
-                         progress=False, auto_adjust=True)
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        if df.empty or len(df) < MIN_DATA_ROWS:
-            return None
-        df.index = pd.to_datetime(df.index)
-        pickle.dump(df, open(cache, "wb"))
-        return df
+        raw = yf.download(
+            tickers, period=DATA_PERIOD, interval="1d",
+            auto_adjust=True, progress=False,
+        )
     except Exception as e:
-        print(f"  [{ticker}] download failed: {e}")
-        return None
+        print(f"  {name}: batch download failed ({e}), skipping.")
+        return {}
+
+    result = {}
+    fields = ["Open", "High", "Low", "Close", "Volume"]
+
+    for ticker in tickers:
+        try:
+            if len(tickers) == 1:
+                df = raw[fields].dropna(how="all")
+            else:
+                df = pd.DataFrame(
+                    {f: raw[f][ticker] for f in fields if f in raw}
+                ).dropna(how="all")
+
+            if len(df) >= MIN_DATA_ROWS:
+                result[ticker] = df
+        except Exception:
+            continue
+
+    print(f"  {name}: {len(result)}/{len(tickers)} assets ready.     ")
+    pickle.dump(result, open(cache, "wb"))
+    return result
 
 
 def fetch_all() -> dict[str, pd.DataFrame]:
     _clean_old_cache()
-    all_tickers = US_STOCKS + DE_STOCKS + CRYPTO
-    result = {}
-    total = len(all_tickers)
-    for i, ticker in enumerate(all_tickers, 1):
-        print(f"  Fetching {ticker} ({i}/{total})", end="\r")
-        df = _download(ticker)
-        if df is not None:
-            result[ticker] = df
-        time.sleep(0.1)  # avoid rate limiting
-    print(f"\n  Loaded {len(result)}/{total} assets.")
-    return result
+    combined = {}
+    for name, tickers in _GROUPS:
+        combined.update(_download_group(name, tickers))
+    print(f"  Total: {len(combined)} assets loaded.")
+    return combined

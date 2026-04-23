@@ -3,6 +3,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
+import xgboost as xgb
 from pathlib import Path
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
@@ -13,8 +14,8 @@ from feature_engine import FEATURE_COLS
 Path(MODEL_DIR).mkdir(exist_ok=True)
 
 _LGB_PARAMS = dict(
-    n_estimators=400,
-    learning_rate=0.04,
+    n_estimators=300,
+    learning_rate=0.05,
     num_leaves=40,
     min_child_samples=40,
     subsample=0.8,
@@ -23,6 +24,20 @@ _LGB_PARAMS = dict(
     random_state=42,
     verbose=-1,
 )
+
+
+def _xgb_params(pos: int, neg: int) -> dict:
+    return dict(
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=5,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        scale_pos_weight=neg / max(pos, 1),
+        random_state=42,
+        verbosity=0,
+        eval_metric="logloss",
+    )
 
 
 def _make_labels(close: pd.Series, horizon_days: int, threshold: float) -> pd.Series:
@@ -42,7 +57,6 @@ def _pool_data(
         labels = _make_labels(close, horizon_days, threshold)
         merged = feat[FEATURE_COLS].copy()
         merged["label"] = labels
-        merged["_ticker"] = ticker
         merged.dropna(inplace=True)
         if len(merged) < 100 or merged["label"].sum() < 15:
             continue
@@ -52,9 +66,7 @@ def _pool_data(
         return pd.DataFrame(), pd.Series(dtype=int)
 
     combined = pd.concat(rows).sort_index()
-    X = combined[FEATURE_COLS]
-    y = combined["label"]
-    return X, y
+    return combined[FEATURE_COLS], combined["label"]
 
 
 def train_models(
@@ -71,11 +83,12 @@ def train_models(
             print(f"[{label}] Not enough data — skipping.")
             continue
 
-        pos_rate = y.mean()
-        print(f"[{label}] {len(X):,} rows | positive rate: {pos_rate:.1%}")
+        pos = int(y.sum())
+        neg = int(len(y) - pos)
+        print(f"[{label}] {len(X):,} rows | positive rate: {y.mean():.1%}")
 
-        # Walk-forward AUC to validate model before saving
-        tscv = TimeSeriesSplit(n_splits=5)
+        # Walk-forward AUC using LightGBM (fast proxy for ensemble quality)
+        tscv = TimeSeriesSplit(n_splits=3)
         aucs = []
         for train_idx, val_idx in tscv.split(X):
             X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
@@ -89,19 +102,23 @@ def train_models(
         mean_auc = np.mean(aucs) if aucs else 0.0
         print(f"[{label}] Walk-forward AUC: {mean_auc:.3f} ± {np.std(aucs):.3f}")
 
-        # Final model: train on full dataset
-        model = lgb.LGBMClassifier(**_LGB_PARAMS)
-        model.fit(X, y)
+        # Train final LightGBM + XGBoost on full dataset
+        lgb_model = lgb.LGBMClassifier(**_LGB_PARAMS)
+        lgb_model.fit(X, y)
 
-        # Print top 5 features for transparency
-        importance = pd.Series(model.feature_importances_, index=FEATURE_COLS)
+        xgb_model = xgb.XGBClassifier(**_xgb_params(pos, neg))
+        xgb_model.fit(X, y)
+
+        # Feature importance from LightGBM
+        importance = pd.Series(lgb_model.feature_importances_, index=FEATURE_COLS)
         top5 = importance.nlargest(5).index.tolist()
         print(f"[{label}] Top features: {', '.join(top5)}")
 
-        model_path = os.path.join(MODEL_DIR, f"model_{label}.pkl")
-        joblib.dump(model, model_path)
-        print(f"[{label}] Saved to {model_path}")
-        models[label] = model
+        ensemble = {"lgb": lgb_model, "xgb": xgb_model}
+        path = os.path.join(MODEL_DIR, f"model_{label}.pkl")
+        joblib.dump(ensemble, path)
+        print(f"[{label}] Ensemble saved to {path}")
+        models[label] = ensemble
 
     return models
 
@@ -125,9 +142,11 @@ def predict(
         if latest.empty:
             continue
         row = {"ticker": ticker}
-        for label, model in models.items():
+        for label, ensemble in models.items():
             try:
-                prob = model.predict_proba(latest)[0][1]
+                lgb_p = ensemble["lgb"].predict_proba(latest)[0][1]
+                xgb_p = ensemble["xgb"].predict_proba(latest)[0][1]
+                prob = (lgb_p + xgb_p) / 2
                 row[f"prob_{label}"] = round(prob * 100, 1)
             except Exception:
                 row[f"prob_{label}"] = None
@@ -137,7 +156,6 @@ def predict(
     if df.empty:
         return df
 
-    # Composite score: 3M weighted most since user target is "few months"
     p1 = df.get("prob_1M", pd.Series(0, index=df.index)).fillna(0)
     p3 = df.get("prob_3M", pd.Series(0, index=df.index)).fillna(0)
     p6 = df.get("prob_6M", pd.Series(0, index=df.index)).fillna(0)

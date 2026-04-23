@@ -105,4 +105,49 @@ if "type" in filtered.columns:
                     st.markdown(f"- **{row[label_col]}** — {p3:.1f}% (3M)")
 
 st.divider()
+
+# ── Model accuracy tracking ────────────────────────────────────────────────────
+st.subheader("📐 Model Accuracy (live tracking)")
+st.caption("Compares past predictions against what actually happened. Fills in automatically after each horizon passes.")
+
+try:
+    import sqlite3 as _sql
+    _conn = _sql.connect("results.db")
+    _acc = _sql.connect("results.db").execute("""
+        SELECT
+            SUM(CASE WHEN hit_1M IS NOT NULL THEN 1 ELSE 0 END) as n_1M,
+            ROUND(AVG(CASE WHEN hit_1M IS NOT NULL THEN hit_1M END)*100,1) as acc_1M,
+            SUM(CASE WHEN hit_3M IS NOT NULL THEN 1 ELSE 0 END) as n_3M,
+            ROUND(AVG(CASE WHEN hit_3M IS NOT NULL THEN hit_3M END)*100,1) as acc_3M,
+            SUM(CASE WHEN hit_6M IS NOT NULL THEN 1 ELSE 0 END) as n_6M,
+            ROUND(AVG(CASE WHEN hit_6M IS NOT NULL THEN hit_6M END)*100,1) as acc_6M
+        FROM outcome_tracking
+    """).fetchone()
+    _conn.close()
+
+    if _acc and _acc[0]:
+        a1, a2, a3 = st.columns(3)
+        with a1:
+            st.metric("1-Month accuracy", f"{_acc[1] or 0:.1f}%", f"{_acc[0]} predictions resolved")
+        with a2:
+            st.metric("3-Month accuracy", f"{_acc[3] or 0:.1f}%", f"{_acc[2]} predictions resolved")
+        with a3:
+            st.metric("6-Month accuracy", f"{_acc[5] or 0:.1f}%", f"{_acc[4]} predictions resolved")
+
+        _hist = __import__("pandas").read_sql("""
+            SELECT prediction_date, ticker,
+                   prob_3M, return_3M, hit_3M
+            FROM outcome_tracking
+            WHERE hit_3M IS NOT NULL
+            ORDER BY prediction_date DESC
+            LIMIT 50
+        """, __import__("sqlite3").connect("results.db"))
+        if not _hist.empty:
+            st.dataframe(_hist, use_container_width=True, hide_index=True)
+    else:
+        st.info("No resolved predictions yet — accuracy data appears after the first horizon (1 month) passes.")
+except Exception:
+    st.info("Accuracy tracking will appear after the first month of predictions.")
+
+st.divider()
 st.caption("Not financial advice. Predictions are statistical estimates based on historical patterns.")
