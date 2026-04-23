@@ -1,4 +1,15 @@
 __pycache__/
+*.pyc
 venv/
-*.log
-*.txt
+.env
+
+# generated data
+models/
+cache/
+*.db
+*.pkl
+*.csv
+results.txt
+historical_signals.csv
+dataset.csv
+charts/

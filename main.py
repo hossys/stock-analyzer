@@ -1,380 +1,118 @@
-from datetime import datetime
-import pandas as pd
-import yfinance as yf
-from ta.momentum import RSIIndicator, StochasticOscillator
-from ta.trend import MACD, EMAIndicator
-from ta.volatility import BollingerBands
-import requests
-import sqlite3
 import os
-import matplotlib.pyplot as plt
-from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-from scipy.stats import norm
-import scipy.stats as stats
-import numpy as np
-import joblib
-import csv
+import sqlite3
+import schedule
+import time
+from datetime import datetime
+
+import pandas as pd
+
+from config import (
+    US_STOCKS, DE_STOCKS, CRYPTO,
+    TICKER_NAMES, DB_PATH, TOP_N, DAILY_RUN_TIME,
+)
+from data_fetcher import fetch_all
+from feature_engine import compute_features
+from ml_engine import train_models, load_models, predict
+from notifier import send_daily_digest
 
 
-
-try:
-    model = joblib.load("trained_model.pkl")
-except Exception as e:
-    model = None
-    print(f"⚠️ ML model not loaded: {e}")
-
-
+def _asset_type(ticker: str) -> str:
+    if ticker in US_STOCKS:
+        return "US Stock"
+    if ticker in DE_STOCKS:
+        return "German Stock"
+    return "Crypto"
 
 
-def append_to_dataset(row, filename="dataset.csv"):
-    file_exists = os.path.isfile(filename)
-    with open(filename, mode="a", newline="") as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(["rsi", "stoch", "macd", "ema20", "ema50", "close", "label"])
-        writer.writerow(row)
-
-def estimate_with_ml(model, features: pd.DataFrame) -> float:
-    return model.predict_proba(features)[0][1] * 100
-
-
-def estimate_probability_with_ml(model, features):
-    if model is None:
-        return None
-    try:
-        prob = model.predict_proba([features])[0][1]   
-        return round(prob * 100, 2)
-    except Exception as e:
-        print(f"⚠️ ML prediction failed: {e}")
-        return None
-
-def save_to_csv(symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50,
-                bb_lower, bb_upper, est_low, est_high, signal, prob_low, prob_high):
-    file_exists = os.path.isfile("historical_signals.csv")
-    with open("historical_signals.csv", mode="a", newline="") as file:
-        writer = csv.writer(file)
-        if not file_exists:
-            writer.writerow([
-                "symbol", "timestamp", "close", "rsi", "stoch", "macd_diff", "ema20", "ema50",
-                "bb_lower", "bb_upper", "est_low", "est_high", "signal", "prob_low", "prob_high"
-            ])
-        writer.writerow([
-            symbol, timestamp, close, rsi, stoch, macd_diff, ema20, ema50,
-            bb_lower, bb_upper, est_low, est_high, signal, prob_low, prob_high
-        ])
+def _build_features(data: dict) -> tuple[dict, dict]:
+    features, prices = {}, {}
+    for ticker, df in data.items():
+        try:
+            features[ticker] = compute_features(df)
+            prices[ticker] = df["Close"].squeeze()
+        except Exception as e:
+            print(f"  [{ticker}] feature error: {e}")
+    return features, prices
 
 
-def estimate_price_probability(current_price, target_price, historical_prices):
-    
-    historical_prices = np.array(historical_prices)
-    log_returns = np.log(historical_prices[1:] / historical_prices[:-1])
-    mean_return = np.mean(log_returns)
-    std_dev = np.std(log_returns)
-
-    price_ratio = target_price / current_price
-    z_score = (np.log(price_ratio) - mean_return) / std_dev
-
-    if target_price > current_price:
-        prob = 1 - norm.cdf(z_score)
-    else:
-        prob = norm.cdf(z_score)
-
-    return round(prob * 100, 2)
-    
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
-    try:
-        requests.post(url, json=payload)
-    except Exception as e:
-        print(f"Telegram error: {e}")
-
-
-def log_to_database(symbol, time, close, rsi, stoch, macd_diff, ema20, ema50, bb_lower, bb_upper, signal,
-                    est_low=None, est_high=None, prob_low_pct=None, prob_high_pct=None):
-    conn = sqlite3.connect("results.db")
-    c = conn.cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS analysis_results (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        symbol TEXT,
-        timestamp TEXT,
-        close REAL,
-        rsi REAL,
-        stoch REAL,
-        macd_diff REAL,
-        ema20 REAL,
-        ema50 REAL,
-        bb_lower REAL,
-        bb_upper REAL,
-        signal TEXT,
-        est_low REAL,
-        est_high REAL,
-        prob_low_pct REAL,
-        prob_high_pct REAL
-    )
-""")
-    c.execute("""
-    INSERT INTO analysis_results (
-        symbol, timestamp, close, rsi, stoch, macd_diff,
-        ema20, ema50, bb_lower, bb_upper, signal,
-        est_low, est_high, prob_low_pct, prob_high_pct
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-""", (
-        symbol, time, close, rsi, stoch, macd_diff,
-        ema20, ema50, bb_lower, bb_upper, signal,
-        est_low, est_high, prob_low_pct, prob_high_pct
-    ))
-    conn.commit()
+def _save(predictions: pd.DataFrame):
+    conn = sqlite3.connect(DB_PATH)
+    predictions["timestamp"] = datetime.now().strftime("%Y-%m-%d")
+    predictions.to_sql("predictions", conn, if_exists="append", index=False)
     conn.close()
 
 
+def _models_exist() -> bool:
+    return os.path.exists("models/model_3M.pkl")
 
 
-def plot_chart(symbol, close, bb_upper, bb_lower, ema20, ema50,
-               est_low=None, est_high=None, signal=None,
-               prob_low_pct=None, prob_high_pct=None):
-    if not os.path.exists("charts"):
-        os.makedirs("charts")
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(close.index, close, label="Close Price", linewidth=2, color='black')
-    plt.plot(ema20.index, ema20, label="EMA-20", color="blue")
-    plt.plot(ema50.index, ema50, label="EMA-50", color="orange")
-    plt.plot(bb_upper.index, bb_upper, '--', label="BB Upper", color="green")
-    plt.plot(bb_lower.index, bb_lower, '--', label="BB Lower", color="red")
+def _should_retrain() -> bool:
+    if not _models_exist():
+        return True
+    return datetime.now().weekday() == 0  # retrain every Monday
 
 
-    if est_low is not None and est_high is not None:
-        plt.axhspan(est_low, est_high, color='yellow', alpha=0.2,
-                    label=f"Est. Range: ${est_low} – ${est_high}")
+def _print_results(predictions: pd.DataFrame):
+    top = predictions.head(TOP_N)
+    print(f"\n{'─'*65}")
+    print(f"{'RANK':<5} {'NAME':<22} {'TYPE':<14} {'1M':>6} {'3M':>6} {'6M':>6} {'SCORE':>7}")
+    print(f"{'─'*65}")
+    for rank, (_, row) in enumerate(top.iterrows(), 1):
+        ticker = row["ticker"]
+        name = TICKER_NAMES.get(ticker, ticker)[:20]
+        asset_type = row.get("type", "")
+        p1 = f"{row.get('prob_1M', 0):.1f}%"
+        p3 = f"{row.get('prob_3M', 0):.1f}%"
+        p6 = f"{row.get('prob_6M', 0):.1f}%"
+        score = f"{row.get('score', 0):.1f}"
+        print(f"{rank:<5} {name:<22} {asset_type:<14} {p1:>6} {p3:>6} {p6:>6} {score:>7}")
+    print(f"{'─'*65}")
+    print("Probabilities = P(price up ≥5%/10%/15% in 1M/3M/6M)")
 
 
-    if signal and prob_low_pct is not None and prob_high_pct is not None:
-        annotation_text = (
-            f"Signal: {signal}\n"
-            f"⬆ {prob_high_pct}% to reach ${est_high}\n"
-            f"⬇ {prob_low_pct}% to drop to ${est_low}"
-        )
-        plt.annotate(annotation_text, xy=(0.02, 0.95), xycoords='axes fraction',
-                     fontsize=9, bbox=dict(boxstyle="round", fc="w", alpha=0.7),
-                     verticalalignment='top')
+def run():
+    print(f"\n{'='*65}")
+    print(f"  Stock Analyzer — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"{'='*65}")
 
-    plt.title(f"{symbol} - Technical Chart")
-    plt.xlabel("Date")
-    plt.ylabel("Price")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
+    print("\n[1/4] Fetching market data...")
+    data = fetch_all()
+    if not data:
+        print("No data fetched. Aborting.")
+        return
 
-    image_path = f"charts/{symbol}.png"
-    plt.savefig(image_path)
-    plt.close()
-    return image_path
+    print("\n[2/4] Computing features...")
+    features, prices = _build_features(data)
+    print(f"  Features ready for {len(features)} assets.")
 
-
-def analyze_stock(symbol):
-    print(f"\n📈 {symbol} — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    data = yf.download(symbol, period="10d", interval="1h", progress=False, auto_adjust=False)
-
-    if data.empty or "Close" not in data:
-        print(f"[{symbol}] ⚠️ No data found.")
-        return None
-
-    close = data["Close"].squeeze()
-    high = data["High"].squeeze()
-    low = data["Low"].squeeze()
-
-    rsi = RSIIndicator(close=close).rsi()
-    stoch = StochasticOscillator(close=close, high=high, low=low).stoch()
-    macd_diff = MACD(close=close).macd_diff()
-    ema20 = EMAIndicator(close=close, window=20).ema_indicator()
-    ema50 = EMAIndicator(close=close, window=50).ema_indicator()
-    bb = BollingerBands(close=close)
-    bb_upper = bb.bollinger_hband()
-    bb_lower = bb.bollinger_lband()
-
-    latest_close = close.iloc[-1]
-    latest_rsi = rsi.iloc[-1]
-    latest_stoch = stoch.iloc[-1]
-    latest_macd_diff = macd_diff.iloc[-1]
-    latest_ema20 = ema20.iloc[-1]
-    latest_ema50 = ema50.iloc[-1]
-    latest_bb_upper = bb_upper.iloc[-1]
-    latest_bb_lower = bb_lower.iloc[-1]
-
-    if model and os.path.exists(model_path):
-        features = pd.DataFrame([{
-            "close": latest_close,
-            "rsi": latest_rsi,
-            "stoch": latest_stoch,
-            "macd_diff": latest_macd_diff,
-            "ema20": latest_ema20,
-            "ema50": latest_ema50
-        }])
-        ml_prob = estimate_with_ml(model, features)
-        print(f"🤖 ML Estimated ↑ Chance: {ml_prob:.2f}%")
-
-    if (
-        latest_ema20 > latest_ema50
-        and latest_rsi < 30
-        and latest_stoch < 20
-        and latest_close < latest_bb_lower
-    ):
-        signal = "🟢 STRONG BUY (Oversold + Trend)"
-    elif (
-        latest_ema20 < latest_ema50
-        and latest_rsi > 70
-        and latest_stoch > 80
-        and latest_close > latest_bb_upper
-    ):
-        signal = "🔴 STRONG SELL (Overbought + Trend)"
+    if _should_retrain():
+        print("\n[3/4] Training ML models (this takes a few minutes on first run)...")
+        models = train_models(features, prices)
     else:
-        signal = "➡️ HOLD (Neutral/Mixed)"
+        print("\n[3/4] Loading existing ML models...")
+        models = load_models()
 
-    mean = close.mean()
-    std = close.std()
-    est_low = round(latest_close - std, 2)
-    est_high = round(latest_close + std, 2)
+    if not models:
+        print("No models available. Aborting.")
+        return
 
-    prob_low = stats.norm(loc=mean, scale=std).cdf(est_low)
-    prob_high = 1 - stats.norm(loc=mean, scale=std).cdf(est_high)
+    print("\n[4/4] Generating predictions...")
+    predictions = predict(models, features)
+    predictions["type"] = predictions["ticker"].apply(_asset_type)
+    predictions["name"] = predictions["ticker"].map(TICKER_NAMES).fillna(predictions["ticker"])
 
-    prob_low_pct = round(prob_low * 100, 1)
-    prob_high_pct = round(prob_high * 100, 1)
-
-    print(f"Close: {latest_close:.2f}")
-    print(f"RSI: {latest_rsi:.2f} | Stoch: {latest_stoch:.2f} | MACD Δ: {latest_macd_diff:.4f}")
-    print(f"EMA-20: {latest_ema20:.2f} | EMA-50: {latest_ema50:.2f}")
-    print(f"Bollinger Bands: {latest_bb_lower:.2f} - {latest_bb_upper:.2f}")
-    print(f"📊 Signal: {signal}")
-    print(f"🔮 Estimated Range: ${est_low} – ${est_high}")
-    print(f"📈 Chance to reach {est_high}: {prob_high_pct}%")
-    print(f"📉 Chance to drop to {est_low}: {prob_low_pct}%")
-
-    with open("results.txt", "a") as f:
-        f.write(f"\n📈 {symbol} — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
-        f.write(f"💵 Close: {latest_close:.2f}\n")
-        f.write(f"📊 RSI: {latest_rsi:.2f} | Stoch: {latest_stoch:.2f} | MACD Δ: {latest_macd_diff:.4f}\n")
-        f.write(f"📈 EMA-20: {latest_ema20:.2f} | EMA-50: {latest_ema50:.2f}\n")
-        f.write(f"📉 Bollinger Bands: {latest_bb_lower:.2f} – {latest_bb_upper:.2f}\n")
-        f.write(f"📊 Signal: {signal}\n")
-        f.write(f"\n🔮 Estimated Range (1σ std): ${est_low} – ${est_high}\n")
-        f.write(f"📈 Chance to reach {est_high}: {prob_high_pct}%\n")
-        f.write(f"📉 Chance to drop to {est_low}: {prob_low_pct}%\n")
-        f.write(f"\n🔮 Bollinger Band Range: ${latest_bb_lower:.2f} – {latest_bb_upper:.2f}\n")
-        f.write(f"📈 Chance to reach {latest_bb_upper:.2f}: {prob_high_pct}%\n")
-        f.write(f"📉 Chance to drop to {latest_bb_lower:.2f}: {prob_low_pct}%\n")
-
-    log_to_database(
-        symbol,
-        datetime.now().strftime('%Y-%m-%d %H:%M'),
-        latest_close,
-        latest_rsi,
-        latest_stoch,
-        latest_macd_diff,
-        latest_ema20,
-        latest_ema50,
-        latest_bb_lower,
-        latest_bb_upper,
-        signal,
-        est_low,
-        est_high,
-        prob_low_pct,
-        prob_high_pct
-    )
-
-    image_path = plot_chart(
-        symbol,
-        close,
-        bb_upper,
-        bb_lower,
-        ema20,
-        ema50,
-        est_low=est_low,
-        est_high=est_high,
-        signal=signal,
-        prob_low_pct=prob_low_pct,
-        prob_high_pct=prob_high_pct
-    )
-
-    save_to_csv(
-        symbol=symbol,
-        timestamp=datetime.now().strftime('%Y-%m-%d %H:%M'),
-        close=latest_close,
-        rsi=latest_rsi,
-        stoch=latest_stoch,
-        macd_diff=latest_macd_diff,
-        ema20=latest_ema20,
-        ema50=latest_ema50,
-        bb_lower=latest_bb_lower,
-        bb_upper=latest_bb_upper,
-        est_low=est_low,
-        est_high=est_high,
-        signal=signal,
-        prob_low=prob_low_pct,
-        prob_high=prob_high_pct
-    )
-
-    ml_features = [
-        latest_close,
-        latest_rsi,
-        latest_stoch,
-        latest_macd_diff,
-        latest_ema20,
-        latest_ema50,
-        latest_bb_lower,
-        latest_bb_upper
-    ]
-
-    label = signal.split()[1]  # STRONG BUY → BUY
-    append_to_dataset([
-        latest_rsi, latest_stoch, latest_macd_diff,
-        latest_ema20, latest_ema50, latest_close, label
-    ])
-
-    telegram_msg = (
-        f"*{symbol}* — {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
-        f"💵 Price: ${latest_close:.2f}\n"
-        f"📊 Signal: {signal}\n"
-        f"🔮 Range: ${est_low} – ${est_high}\n"
-        f"📈 Chance to reach {est_high}: {prob_high_pct}%\n"
-        f"📉 Chance to drop to {est_low}: {prob_low_pct}%"
-    )
-
-    send_telegram_message(telegram_msg)
-    return image_path
+    _save(predictions)
+    _print_results(predictions)
+    send_daily_digest(predictions)
+    print("\nDone. Next run scheduled for tomorrow at", DAILY_RUN_TIME)
 
 
 if __name__ == "__main__":
-    print("=== ADVANCED STOCK ANALYZER (HOURLY) ===")
-    symbols = ["AAPL", "GOOGL", "MSFT", "NVDA", "AMZN", "TSLA", "AMD", "COIN", "LCID"]
-    image_paths = {}
-
-    for symbol in symbols:
-        result = analyze_stock(symbol)
-        if result:
-            image_paths[symbol] = result
-
-    if image_paths:
-        print("\nAvailable plots:")
-        for i, symbol in enumerate(image_paths.keys(), 1):
-            print(f"{i}. {symbol}")
-
-        choice = input("\nEnter the number of the stock to view its chart: ")
-        try:
-            index = int(choice) - 1
-            selected_symbol = list(image_paths.keys())[index]
-            selected_path = image_paths[selected_symbol]
-            from PIL import Image
-            Image.open(selected_path).show()
-            ml_prob = estimate_probability_with_ml(model, ml_features)
-            if ml_prob is not None:
-                print(f"🤖 ML Estimated chance of price increase: {ml_prob}%")
-        
-        except Exception as e:
-            print(f"Invalid selection: {e}")
+    import sys
+    once = "--once" in sys.argv
+    run()
+    if not once:
+        schedule.every().day.at(DAILY_RUN_TIME).do(run)
+        while True:
+            schedule.run_pending()
+            time.sleep(30)
