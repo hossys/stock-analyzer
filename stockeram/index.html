@@ -503,7 +503,7 @@ async function fetchLivePicks() {
     // Replace static picks with live ML predictions
     picks.length = 0;
     picks.push(...data.picks.map(p => ({
-      type:         p.type        || 'stock',
+      type:         ({'US Stock':'stock','German Stock':'stock','ETF':'etf','Crypto':'crypto'}[p.type] || p.type || 'stock'),
       signal:       p.signal      || 'watch',
       name:         p.name        || p.ticker,
       flag:         p.flag        || '📈',
@@ -1419,12 +1419,29 @@ function updateAddList(q='') {
   const port = getPortfolio();
   const list = document.getElementById('add-list');
   if (!list) return;
-  const groups = [{label:'📈 Stocks',type:'stock'},{label:'🪙 Crypto',type:'crypto'},{label:'📊 ETFs',type:'etf'}];
-  let html = '';
+
+  if (!picks.length) {
+    list.innerHTML='<p style="color:var(--lbl3);text-align:center;padding:20px 0">Loading assets… please wait a moment and try again.</p>';
+    return;
+  }
+
+  const nStocks = picks.filter(p=>p.type==='stock').length;
+  const nCrypto = picks.filter(p=>p.type==='crypto').length;
+  const nEtfs   = picks.filter(p=>p.type==='etf').length;
+
+  const groups = [
+    {label:`📈 Stocks (${nStocks})`, type:'stock'},
+    {label:`🪙 Crypto (${nCrypto})`, type:'crypto'},
+    {label:`📊 ETFs (${nEtfs})`,     type:'etf'},
+  ];
+  let html = '', total = 0;
   groups.forEach(g => {
-    const items = picks.filter(p=>p.type===g.type && (!ql||p.name.toLowerCase().includes(ql)||p.ticker.toLowerCase().includes(ql)));
+    const items = picks
+      .filter(p=>p.type===g.type && (!ql||p.name.toLowerCase().includes(ql)||p.ticker.toLowerCase().includes(ql)))
+      .sort((a,b)=>a.name.localeCompare(b.name));
     if (!items.length) return;
     html += `<div class="add-group-title">${g.label}</div>`;
+    total += items.length;
     items.forEach(p => {
       const added = port.includes(p.ticker);
       const rec   = getRecommendation(p);
@@ -1440,7 +1457,7 @@ function updateAddList(q='') {
       </div>`;
     });
   });
-  list.innerHTML = html || '<p style="color:var(--lbl3);text-align:center;padding:20px 0">No results found</p>';
+  list.innerHTML = total ? html : '<p style="color:var(--lbl3);text-align:center;padding:20px 0">No results found</p>';
 }
 function filterAddList(){ updateAddList(document.getElementById('addSearch')?.value||''); }
 
