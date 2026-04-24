@@ -58,6 +58,8 @@ def _pool_data(
         labels = _make_labels(close, horizon_days, threshold)
         merged = feat[FEATURE_COLS].copy()
         merged["label"] = labels
+        # Replace inf/-inf before dropping NaN — XGBoost crashes on inf
+        merged.replace([np.inf, -np.inf], np.nan, inplace=True)
         merged.dropna(inplace=True)
         if len(merged) < 100 or merged["label"].sum() < 15:
             continue
@@ -170,7 +172,7 @@ def predict(
 ) -> pd.DataFrame:
     rows = []
     for ticker, feat in features_by_ticker.items():
-        latest = feat[FEATURE_COLS].dropna().tail(1)
+        latest = feat[FEATURE_COLS].replace([np.inf, -np.inf], np.nan).dropna().tail(1)
         if latest.empty:
             continue
         row = {"ticker": ticker}
