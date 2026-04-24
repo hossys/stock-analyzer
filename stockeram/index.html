@@ -254,26 +254,92 @@ html,body{
 .obtn{background:var(--grad);color:#fff;border:none;padding:13px 24px;border-radius:100px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer}
 .odisc{font-size:10px;color:var(--lbl3);max-width:280px;margin-top:18px;line-height:1.5}
 
-/* SCREENS */
-.screen{position:fixed;inset:0;background:#000;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 28px calc(60px + var(--sb))}
+/* SCREENS — padding uses JS-measured nav height */
+.screen{position:fixed;inset:0;background:#000;z-index:200;display:none;flex-direction:column;align-items:flex-start;
+  padding:calc(var(--nav-bottom,130px) + 12px) 18px calc(var(--sb) + 58px);overflow-y:auto}
 .screen.active{display:flex}
-.scr-title{font-size:28px;font-weight:800;letter-spacing:-.03em;margin-bottom:10px;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.scr-sub{font-size:14px;color:var(--lbl2);line-height:1.5;max-width:270px}
-.saved-list{width:100%;max-width:380px;margin-top:18px;text-align:left;overflow-y:auto;max-height:50vh}
-.sitem{padding:12px 14px;background:rgba(255,255,255,.06);border-radius:13px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.scr-title{font-size:26px;font-weight:800;letter-spacing:-.03em;margin-bottom:6px;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;width:100%}
+.scr-sub{font-size:13px;color:var(--lbl2);line-height:1.5;max-width:320px;margin-bottom:16px}
+/* Saved list */
+.saved-list{width:100%;text-align:left;overflow-y:auto}
+.sitem{padding:12px 14px;background:rgba(255,255,255,.06);border-radius:13px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center}
 .sname{font-weight:700;font-size:15px}.stick{font-size:11px;color:var(--lbl2);font-family:'SF Mono',Menlo,monospace;margin-top:2px}
 .rmbtn{background:none;border:none;color:var(--lbl3);font-size:22px;cursor:pointer;padding:2px 8px}
+/* Segmented control */
+.seg-ctrl{display:flex;background:rgba(255,255,255,.08);border-radius:11px;padding:3px;margin-bottom:16px;width:100%}
+.seg-btn{flex:1;padding:8px;border:none;background:none;color:var(--lbl2);font-size:14px;font-weight:600;border-radius:9px;cursor:pointer;font-family:inherit;transition:all .2s}
+.seg-btn.active{background:var(--brand);color:#fff}
 .saved-empty{font-size:13px;color:var(--lbl3);margin-top:16px;line-height:1.6}
-/* Learn */
-.learn-list{width:100%;max-width:420px;overflow-y:auto;max-height:calc(var(--vh,1vh)*100 - 180px);padding-bottom:20px}
-.lesson{background:rgba(255,255,255,.06);border-radius:16px;margin-bottom:10px;overflow:hidden;cursor:pointer}
-.lesson-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
-.lesson-emoji{font-size:22px;margin-right:10px}
-.lesson-title{font-size:15px;font-weight:700;flex:1}
-.lesson-simple{font-size:12px;color:var(--lbl2);margin-top:2px}
-.lesson-chevron{font-size:18px;color:var(--lbl3);transition:transform .2s}
-.lesson.open .lesson-chevron{transform:rotate(90deg)}
-.lesson-body{display:none;padding:0 16px 14px;font-size:13px;color:var(--lbl2);line-height:1.6;border-top:.5px solid rgba(255,255,255,.08)}
+/* ── PORTFOLIO ──────────────────────────────────────────────────────────────── */
+.port-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;width:100%}
+.port-add-btn{background:var(--brand);color:#fff;border:none;border-radius:100px;padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.port-summary{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;width:100%}
+.sum-chip{padding:5px 12px;border-radius:100px;font-size:12px;font-weight:600;white-space:nowrap}
+.sum-chip.all{background:rgba(255,255,255,.1);color:var(--lbl2)}
+.sum-chip.buy{background:rgba(48,209,88,.15);color:var(--green)}
+.sum-chip.hold{background:rgba(255,159,10,.15);color:var(--orange)}
+.sum-chip.sell{background:rgba(255,69,58,.15);color:var(--red)}
+.port-list{width:100%;max-width:420px;overflow-y:auto;max-height:calc(var(--vh,1vh)*100 - 200px)}
+.port-card{background:var(--card);border-radius:18px;padding:15px 16px;margin-bottom:10px;cursor:pointer;transition:opacity .2s;position:relative}
+.port-card:active{opacity:.8}
+.port-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:10px}
+.port-card-name{font-size:18px;font-weight:800;letter-spacing:-.02em}
+.port-card-meta{font-size:12px;color:var(--lbl2);margin-top:2px}
+.rec-badge{padding:6px 12px;border-radius:100px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.rec-badge.buy{background:rgba(48,209,88,.18);color:var(--green)}
+.rec-badge.hold{background:rgba(255,159,10,.18);color:var(--orange)}
+.rec-badge.sell{background:rgba(255,69,58,.18);color:var(--red)}
+.port-stats{display:flex;gap:14px;font-size:13px;color:var(--lbl2);margin-bottom:6px}
+.port-stats strong{color:var(--lbl)}
+.port-reason{font-size:12px;color:var(--lbl3);line-height:1.5}
+.port-sell-box{background:rgba(255,69,58,.08);border:1px solid rgba(255,69,58,.2);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12px;color:rgba(255,150,140,.9);line-height:1.5}
+.port-remove{background:none;border:none;color:var(--lbl3);font-size:11px;padding:6px 0 0;cursor:pointer;font-family:inherit;display:block;margin-top:6px}
+
+/* ── LIKED TRACKING ───────────────────────────────────────────────────────── */
+.liked-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--lbl2);margin:20px 0 10px;display:flex;align-items:center;gap:6px}
+.liked-card{background:var(--card);border-radius:16px;padding:14px 15px;margin-bottom:10px}
+.liked-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.liked-card-name{font-size:16px;font-weight:800;letter-spacing:-.02em}
+.liked-card-date{font-size:11px;color:var(--lbl3);margin-top:2px}
+.liked-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.liked-table th{text-align:left;font-size:10px;color:var(--lbl3);padding:0 0 6px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.liked-table th:not(:first-child){text-align:center}
+.liked-table td{padding:5px 0;font-size:13px;border-top:.5px solid rgba(255,255,255,.06)}
+.liked-table td:not(:first-child){text-align:center}
+.liked-table td:first-child{color:var(--lbl2);font-size:12px}
+.ch-up{color:var(--green);font-weight:700}
+.ch-dn{color:var(--red);font-weight:700}
+.ch-eq{color:var(--lbl3)}
+.liked-note{font-size:10px;color:var(--lbl3);margin-top:10px;line-height:1.5;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px}
+.unlike-btn{background:none;border:none;color:var(--lbl3);font-size:11px;cursor:pointer;font-family:inherit;padding:3px 0;line-height:1}
+
+/* Add holding sheet */
+.add-search{width:100%;background:rgba(255,255,255,.08);border:.5px solid rgba(255,255,255,.14);border-radius:12px;padding:11px 14px;color:#fff;font-size:15px;font-family:inherit;outline:none;margin-bottom:4px}
+.add-search::placeholder{color:var(--lbl3)}
+.add-group-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--lbl2);margin:14px 0 6px}
+.add-item{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:.5px solid var(--sep);cursor:pointer}
+.add-item:active{opacity:.7}
+.add-item-info{display:flex;align-items:center;gap:10px}
+.add-item-flag{font-size:22px}
+.add-item-name{font-size:15px;font-weight:600}
+.add-item-sub{font-size:11px;color:var(--lbl2);font-family:'SF Mono',Menlo,monospace;margin-top:1px}
+.add-check{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+.add-check.on{background:var(--brand);font-size:14px;color:#fff}
+.add-check.off{border:1.5px solid rgba(255,255,255,.2)}
+
+/* Learn — clean redesign */
+.learn-list{width:100%;overflow-y:auto;padding-bottom:20px}
+.lesson{border-bottom:.5px solid rgba(255,255,255,.08);cursor:pointer;overflow:hidden}
+.lesson:last-child{border-bottom:none}
+.lesson-head{display:flex;align-items:center;gap:14px;padding:14px 4px}
+.lesson-icon{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.08);display:grid;place-items:center;font-size:20px;flex-shrink:0}
+.lesson-text{flex:1;min-width:0}
+.lesson-title{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.lesson-simple{font-size:12px;color:var(--lbl2);margin-top:2px;line-height:1.4}
+.lesson-chevron{font-size:16px;color:var(--lbl3);transition:transform .22s;flex-shrink:0}
+.lesson.open .lesson-chevron{transform:rotate(90deg);color:var(--brand)}
+.lesson.open .lesson-icon{background:rgba(191,90,242,.15)}
+.lesson-body{display:none;padding:0 0 16px 56px;font-size:13px;color:var(--lbl2);line-height:1.65}
 .lesson.open .lesson-body{display:block}
 </style>
 </head>
@@ -316,9 +382,18 @@ html,body{
   <div class="tab" data-tab="explore" onclick="switchTab('explore')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="tlbl">Explore</span></div>
   <div class="tab" data-tab="saved" onclick="switchTab('saved')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><span class="tlbl">Saved</span></div>
   <div class="tab" data-tab="learn" onclick="switchTab('learn')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg><span class="tlbl">Learn</span></div>
-  <div class="tab" data-tab="profile" onclick="switchTab('profile')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="tlbl">Profile</span></div>
+  <div class="tab" data-tab="portfolio" onclick="switchTab('portfolio')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg><span class="tlbl">Portfolio</span></div>
 </div>
 <div class="home-ind"></div>
+
+<!-- Add holding sheet -->
+<div class="sheet" id="add-sheet">
+  <div class="sh-handle"></div>
+  <h3 class="sh-title">Add to Portfolio</h3>
+  <p class="sh-sub">Select the stocks, crypto or ETFs you own or want to track.</p>
+  <input class="add-search" id="addSearch" placeholder="🔍  Search by name or ticker…" oninput="filterAddList()" autocomplete="off" autocorrect="off">
+  <div id="add-list" style="overflow-y:auto;max-height:52vh;padding-bottom:12px"></div>
+</div>
 
 <!-- Two-row action bar: CTA + 4 actions. Fixed above tab bar. -->
 <div class="action-bar" id="actionBar">
@@ -348,13 +423,29 @@ html,body{
 
 <!-- Placeholder screens -->
 <div class="screen" id="screen-explore"><div class="scr-title">Explore</div><p class="scr-sub">Search any stock, sector, or crypto. Coming soon.</p></div>
-<div class="screen" id="screen-saved"><div class="scr-title">Saved</div><div class="saved-list" id="saved-list"></div></div>
-<div class="screen" id="screen-learn" style="justify-content:flex-start;padding-top:calc(var(--st)+100px)">
-  <div class="scr-title" style="margin-bottom:6px">Learn</div>
-  <p style="font-size:13px;color:var(--lbl2);margin-bottom:16px">Everything in the app — explained simply.</p>
+<div class="screen" id="screen-saved">
+  <div class="scr-title">Watchlist</div>
+  <div class="seg-ctrl">
+    <button class="seg-btn active" id="seg-saved" onclick="switchWatchlist('saved')">💾 Saved</button>
+    <button class="seg-btn" id="seg-liked" onclick="switchWatchlist('liked')">❤️ Liked & Tracked</button>
+  </div>
+  <div id="watchlist-saved" class="saved-list" style="width:100%"></div>
+  <div id="watchlist-liked" style="display:none;width:100%"></div>
+</div>
+<div class="screen" id="screen-learn">
+  <div class="scr-title">Learn</div>
+  <p style="font-size:13px;color:var(--lbl2);margin-bottom:16px;width:100%">Everything in the app — explained simply. Tap any topic to expand.</p>
   <div class="learn-list" id="learn-list"></div>
 </div>
-<div class="screen" id="screen-profile"><div class="scr-title">Profile</div><p class="scr-sub">Settings and performance history. Coming soon.</p></div>
+<div class="screen" id="screen-portfolio">
+  <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:4px">
+    <div class="scr-title" style="margin-bottom:0">My Portfolio</div>
+    <button class="port-add-btn" onclick="openAddSheet()">+ Add</button>
+  </div>
+  <p style="font-size:13px;color:var(--lbl2);margin-bottom:14px;width:100%">Stocks, crypto &amp; ETFs you own — with buy/sell signals.</p>
+  <div id="port-summary" style="width:100%"></div>
+  <div style="width:100%;overflow-y:auto" id="port-list"></div>
+</div>
 
 <!-- Backdrop -->
 <div class="backdrop" id="backdrop" onclick="closeAll()"></div>
@@ -396,6 +487,65 @@ html,body{
 </div>
 
 <script>
+// ── LIVE DATA ─────────────────────────────────────────────────────────────────
+// The stock analyzer generates picks.json daily via GitHub Actions.
+// The app fetches it fresh on each load so predictions are always up-to-date.
+const PICKS_URL = 'https://raw.githubusercontent.com/hossys/stock-analyzer/main/picks.json';
+
+async function fetchLivePicks() {
+  try {
+    const res = await fetch(PICKS_URL + '?v=' + Date.now(), {cache: 'no-store'});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data.picks || !data.picks.length) throw new Error('Empty picks');
+
+    // Replace static picks with live ML predictions
+    picks.length = 0;
+    picks.push(...data.picks.map(p => ({
+      type:         p.type        || 'stock',
+      signal:       p.signal      || 'watch',
+      name:         p.name        || p.ticker,
+      flag:         p.flag        || '📈',
+      ticker:       p.ticker,
+      sector:       p.sector      || '',
+      priceNow:     p.priceNow    || 0,
+      priceTarget:  p.priceTarget || 0,
+      bestCase:     p.bestCase    || 0,
+      worstCase:    p.worstCase   || 0,
+      currency:     p.currency    || '$',
+      score:        p.score       || 0,
+      scoreVerdict: p.scoreVerdict|| 'AI signal',
+      scoreColor:   p.scoreColor  || 'amber',
+      prob1W:       p.prob1W      || 0,
+      prob1M:       p.prob1M      || 0,
+      prob3M:       p.prob3M      || 0,
+      prob6M:       p.prob6M      || 0,
+      reasons:      p.reasons     || [],
+      signals:      p.signals     || [],
+      // Extra fields for portfolio/liked display
+      fundLabel:    p.fundLabel   || '',
+      sentimentLabel: p.sentimentLabel || '',
+      analystLabel: p.analystLabel|| '',
+      insiderLabel: p.insiderLabel|| '',
+      earningsNote: p.earningsNote|| '',
+    })));
+
+    // Update market status in intro screen
+    if (data.market) {
+      const spy = data.market.spy_vs_200ma || 0;
+      const dir = spy >= 0 ? 'above' : 'below';
+      META.market = `${data.market.regime} · S&P ${Math.abs(spy).toFixed(1)}% ${dir} 200MA`;
+    }
+    if (data.generated) META.lastUpdated = data.generated;
+    console.log(`✅ Loaded ${picks.length} live picks from ${data.generated}`);
+    return true;
+  } catch (e) {
+    console.log('⚠️ Using static data:', e.message);
+    return false;
+  }
+}
+
 // ── VIEWPORT + NAV FIX (Safari iOS) ──────────────────────────────────────────
 function setDimensions() {
   document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
@@ -844,11 +994,11 @@ let currentPage = null;
 
 function showOverlays(page) {
   currentPage = page;
-  const ticker = page.dataset.ticker;
-  const p = picks.find(x => x.ticker === ticker);
+  const ticker  = page.dataset.ticker;
+  const liked   = isLiked(ticker);
   document.getElementById('gSave').classList.toggle('saved', isSaved(ticker));
-  document.getElementById('gLikeCount').textContent = fmtK(p ? (p.likeCount || 1200) : 1200);
-  document.getElementById('gLike').classList.remove('liked');
+  document.getElementById('gLike').classList.toggle('liked', liked);
+  document.getElementById('gLikeCount').textContent = liked ? 'Liked ❤️' : 'Like';
   document.getElementById('actionBar').style.display = 'flex';
 }
 function hideOverlays() {
@@ -863,9 +1013,12 @@ function handleGlobalSave() {
   el.classList.toggle('saved', toggleSave(currentPage.dataset.ticker));
 }
 function handleGlobalLike() {
-  const el  = document.getElementById('gLike');
-  el.classList.toggle('liked');
-  document.getElementById('gLikeCount').textContent = el.classList.contains('liked') ? 'Liked ❤️' : 'Like';
+  if (!currentPage) return;
+  const ticker  = currentPage.dataset.ticker;
+  const nowLiked = toggleLikedPick(ticker);
+  const el = document.getElementById('gLike');
+  el.classList.toggle('liked', nowLiked);
+  document.getElementById('gLikeCount').textContent = nowLiked ? 'Liked ❤️' : 'Like';
 }
 function handleGlobalShare() {
   if (!currentPage) return;
@@ -945,14 +1098,30 @@ function switchTab(name) {
     feedEl.style.display='none'; dotsEl.style.display='none'; navFilter.style.display='none';
     hideOverlays();
     document.getElementById('screen-'+name)?.classList.add('active');
-    if(name==='saved') renderSavedScreen();
+    if(name==='saved'){ switchWatchlist(activeWatchlistTab||'saved'); }
+    if(name==='portfolio') { renderPortfolioScreen(); renderLikedSection(); }
   }
+}
+
+let activeWatchlistTab = 'saved';
+function switchWatchlist(tab) {
+  activeWatchlistTab = tab;
+  document.getElementById('seg-saved').classList.toggle('active', tab==='saved');
+  document.getElementById('seg-liked').classList.toggle('active', tab==='liked');
+  document.getElementById('watchlist-saved').style.display = tab==='saved'?'block':'none';
+  document.getElementById('watchlist-liked').style.display = tab==='liked'?'block':'none';
+  if (tab==='liked') renderLikedInWatchlist();
+  else renderSavedScreen();
 }
 
 function renderSavedScreen() {
   const saved = getSaved();
-  const list = document.getElementById('saved-list');
-  if (!saved.length) { list.innerHTML='<p class="saved-empty">No saved picks yet.<br>Swipe through today\'s picks and tap <strong>Save</strong>.</p>'; return; }
+  const list = document.getElementById('watchlist-saved');
+  if (!list) return;
+  if (!saved.length) {
+    list.innerHTML='<div class="saved-empty" style="text-align:center;padding:30px 0;color:var(--lbl3)">No saved picks yet.<br><br>Swipe through Today\'s picks and tap <strong>Save</strong> (bookmark icon).</div>';
+    return;
+  }
   list.innerHTML = saved.map(ticker => {
     const p = picks.find(x => x.ticker===ticker);
     const sig = p ? (p.signal==='buy'?'✅':'👀') : '';
@@ -963,6 +1132,38 @@ function renderSavedScreen() {
         <span style="font-size:20px;color:var(--lbl3)">›</span>
         <button class="rmbtn" onclick="event.stopPropagation();removeSaved('${ticker}')">×</button>
       </div>
+    </div>`;
+  }).join('');
+}
+
+function renderLikedInWatchlist() {
+  const el = document.getElementById('watchlist-liked');
+  if (!el) return;
+  const map = getLikedMap();
+  const entries = Object.entries(map);
+  if (!entries.length) {
+    el.innerHTML='<div style="text-align:center;padding:30px 0;color:var(--lbl3)">No liked picks yet.<br><br>Tap ❤️ on any pick to start tracking how the prediction changes over time.</div>';
+    return;
+  }
+  el.innerHTML = entries.map(([ticker, data]) => {
+    const p = picks.find(x => x.ticker===ticker);
+    const snap = data.snapshot;
+    const date = new Date(data.likedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    const now = p ? {score:p.score,prob1W:p.prob1W||55,prob1M:p.prob1M,prob3M:p.prob3M,prob6M:p.prob6M} : snap;
+    const rows = snap ? [['1W',snap.prob1W||55,now?.prob1W||55,'%'],['1M',snap.prob1M,now?.prob1M,'%'],['3M',snap.prob3M,now?.prob3M,'%'],['Score',snap.score,now?.score,'']] : [];
+    return `<div class="liked-card" onclick="goToPick('${ticker}')" style="cursor:pointer">
+      <div class="liked-card-top">
+        <div>
+          <div class="liked-card-name">${p?p.flag:'❤️'} ${p?p.name:ticker}</div>
+          <div class="liked-card-date">Tracked since ${date}</div>
+        </div>
+        <button class="unlike-btn" onclick="event.stopPropagation();doUnlike('${ticker}')">Unlike ×</button>
+      </div>
+      ${snap?`<table class="liked-table">
+        <tr><th>Horizon</th><th>When liked</th><th>Now</th><th>Change</th></tr>
+        ${rows.map(([l,t,n,u])=>`<tr><td>${l}</td><td>${t}${u}</td><td><strong>${n}${u}</strong></td><td>${_chg(t,n,u)}</td></tr>`).join('')}
+      </table>
+      <div class="liked-note">📊 Predictions update daily. Check back to see if the AI was right.</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -985,14 +1186,275 @@ function goToPick(ticker) {
   });
 }
 
+// ── LIKED TRACKING ───────────────────────────────────────────────────────────
+// Saves prediction snapshot at like time so you can compare against future values
+const LIKED_KEY = 'stockeram_liked_v2';
+
+function getLikedMap() {
+  try { return JSON.parse(localStorage.getItem(LIKED_KEY)||'{}') } catch { return {} }
+}
+function isLiked(ticker) { return !!getLikedMap()[ticker]; }
+
+function toggleLikedPick(ticker) {
+  const map = getLikedMap();
+  if (map[ticker]) {
+    delete map[ticker];
+    localStorage.setItem(LIKED_KEY, JSON.stringify(map));
+    renderLikedSection();
+    return false;
+  }
+  const p = picks.find(x => x.ticker === ticker);
+  map[ticker] = {
+    likedAt: new Date().toISOString(),
+    snapshot: p ? {
+      score:  p.score,
+      prob1W: p.prob1W || 55,
+      prob1M: p.prob1M,
+      prob3M: p.prob3M,
+      prob6M: p.prob6M,
+      signal: p.signal,
+    } : null,
+  };
+  localStorage.setItem(LIKED_KEY, JSON.stringify(map));
+  renderLikedSection();
+  return true;
+}
+
+function _chg(then, now, unit) {
+  const d = now - then;
+  if (Math.abs(d) < 0.3) return `<span class="ch-eq">→</span>`;
+  const s = d > 0 ? '+' : '';
+  return d > 0
+    ? `<span class="ch-up">↑ ${s}${d.toFixed(1)}${unit}</span>`
+    : `<span class="ch-dn">↓ ${d.toFixed(1)}${unit}</span>`;
+}
+
+function renderLikedSection() {
+  const el = document.getElementById('liked-section');
+  const wrap = document.getElementById('liked-section-wrap');
+  if (!el) return;
+
+  const map = getLikedMap();
+  const entries = Object.entries(map);
+
+  if (!entries.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'block';
+
+  el.innerHTML = entries.map(([ticker, data]) => {
+    const p     = picks.find(x => x.ticker === ticker);
+    const snap  = data.snapshot;
+    const date  = new Date(data.likedAt).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+    const name  = p ? p.name : ticker;
+    const flag  = p ? p.flag : '📈';
+
+    const now = p ? {
+      score: p.score, prob1W: p.prob1W||55,
+      prob1M: p.prob1M, prob3M: p.prob3M, prob6M: p.prob6M,
+    } : snap;
+
+    const rows = snap ? [
+      ['1 Week',   snap.prob1W||55, now.prob1W||55, '%'],
+      ['1 Month',  snap.prob1M,     now.prob1M,     '%'],
+      ['3 Months', snap.prob3M,     now.prob3M,     '%'],
+      ['6 Months', snap.prob6M,     now.prob6M,     '%'],
+      ['AI Score', snap.score,      now.score,      '/10'],
+    ] : [];
+
+    const hasChange = snap && rows.some(([,t,n]) => Math.abs(n-t) >= 0.3);
+
+    return `<div class="liked-card">
+      <div class="liked-card-top">
+        <div>
+          <div class="liked-card-name">${flag} ${name}</div>
+          <div class="liked-card-date">Tracked since ${date}</div>
+        </div>
+        <button class="unlike-btn" onclick="doUnlike('${ticker}')">Unlike ×</button>
+      </div>
+      ${snap ? `
+      <table class="liked-table">
+        <tr>
+          <th>Horizon</th>
+          <th>When liked</th>
+          <th>Now</th>
+          <th>Change</th>
+        </tr>
+        ${rows.map(([lbl,then,now,unit]) => `<tr>
+          <td>${lbl}</td>
+          <td>${then}${unit}</td>
+          <td><strong>${now}${unit}</strong></td>
+          <td>${_chg(then, now, unit)}</td>
+        </tr>`).join('')}
+      </table>
+      <div class="liked-note">
+        ${hasChange
+          ? '📊 Predictions have changed since you liked this pick.'
+          : '📊 Predictions unchanged since you liked this. They update every morning — check back tomorrow.'}
+      </div>` : `<p style="color:var(--lbl3);font-size:12px">No data snapshot available.</p>`}
+    </div>`;
+  }).join('');
+}
+
+function doUnlike(ticker) {
+  toggleLikedPick(ticker);
+  // Update heart button state if this ticker is currently visible
+  if (currentPage && currentPage.dataset.ticker === ticker) {
+    document.getElementById('gLike').classList.remove('liked');
+    document.getElementById('gLikeCount').textContent = 'Like';
+  }
+}
+
+// ── PORTFOLIO ─────────────────────────────────────────────────────────────────
+const PORT_KEY = 'stockeram_portfolio';
+const getPortfolio   = () => { try{return JSON.parse(localStorage.getItem(PORT_KEY)||'[]')}catch{return []} };
+const isInPortfolio  = t => getPortfolio().includes(t);
+
+function togglePortfolio(ticker) {
+  let p = getPortfolio();
+  p = p.includes(ticker) ? p.filter(t=>t!==ticker) : [...p, ticker];
+  localStorage.setItem(PORT_KEY, JSON.stringify(p));
+  renderPortfolioScreen();
+  updateAddList(document.getElementById('addSearch')?.value || '');
+}
+
+function getRecommendation(p) {
+  if (!p) return {label:'No Analysis', cls:'hold', action:'unknown'};
+  const s = p.score;
+  if (s >= 7.5 && p.signal==='buy') return {label:'🔥 Strong Buy More', cls:'buy',  action:'buy-more'};
+  if (s >= 6.0 && p.signal==='buy') return {label:'✅ Buy More',         cls:'buy',  action:'buy-more'};
+  if (s >= 5.5)                     return {label:'🟡 Hold',             cls:'hold', action:'hold'};
+  if (s >= 4.5)                     return {label:'🟠 Watch Closely',    cls:'hold', action:'watch'};
+  return                                   {label:'🔴 Consider Selling', cls:'sell', action:'sell'};
+}
+
+function getSellAdvice(p) {
+  if (!p || p.score >= 5.5) return '';
+  const reasons = [];
+  if (p.score < 5.0) reasons.push(`AI score has dropped to ${p.score}/10`);
+  if (p.prob3M < 48) reasons.push(`Low chance of 10% gain in 3 months (${p.prob3M}%)`);
+  const neg = p.reasons?.filter(r=>r.t==='warn').map(r=>r.text) || [];
+  if (neg.length) reasons.push(...neg);
+  return reasons.slice(0,2).join(' · ');
+}
+
+function renderPortfolioScreen() {
+  const portfolio = getPortfolio();
+  const list    = document.getElementById('port-list');
+  const summary = document.getElementById('port-summary');
+  if (!list) return;
+
+  if (!portfolio.length) {
+    summary.innerHTML = '';
+    list.innerHTML = `
+      <div onclick="openAddSheet()" style="background:linear-gradient(135deg,rgba(191,90,242,.12),rgba(255,55,95,.08));
+        border:1.5px dashed rgba(191,90,242,.35);border-radius:20px;padding:28px 20px;
+        text-align:center;cursor:pointer;margin-bottom:16px">
+        <div style="font-size:44px;margin-bottom:12px">➕</div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:8px">Add Your First Holding</div>
+        <div style="font-size:13px;color:var(--lbl2);line-height:1.6;max-width:240px;margin:0 auto">
+          Tap here to search and add the stocks, crypto or ETFs you own.<br>
+          We'll show you when to buy more or consider selling.
+        </div>
+        <div style="margin-top:16px;background:var(--brand);color:#fff;border-radius:100px;
+          padding:10px 24px;display:inline-block;font-size:14px;font-weight:700">
+          + Add Holdings
+        </div>
+      </div>`;
+    return;
+  }
+
+  const cards = portfolio.map(ticker => {
+    const p   = picks.find(x=>x.ticker===ticker);
+    const rec = getRecommendation(p);
+    const advice = getSellAdvice(p);
+    return {
+      action: rec.action,
+      html: `<div class="port-card" onclick="goToPick('${ticker}')">
+        <div class="port-card-top">
+          <div>
+            <div class="port-card-name">${p?p.flag:'📈'} ${p?p.name:ticker}</div>
+            <div class="port-card-meta">${ticker}${p?' · '+p.sector:''}</div>
+          </div>
+          <span class="rec-badge ${rec.cls}">${rec.label}</span>
+        </div>
+        ${p?`<div class="port-stats">
+          <span>Score: <strong>${p.score}/10</strong></span>
+          <span>1W: <strong>${p.prob1W||55}%</strong></span>
+          <span>3M: <strong>${p.prob3M}%</strong></span>
+        </div>`:''}
+        ${advice?`<div class="port-sell-box">⚠️ ${advice}</div>`:''}
+        ${p && rec.action==='buy-more' && p.reasons?.[0]?`<div class="port-reason">Why: ${p.reasons[0].text}</div>`:''}
+        <button class="port-remove" onclick="event.stopPropagation();togglePortfolio('${ticker}')">Remove from portfolio ×</button>
+      </div>`
+    };
+  });
+
+  // Sell alerts first, then watch/hold, then buy more
+  const order = {'sell':0,'watch':1,'hold':2,'buy-more':3,'unknown':4};
+  cards.sort((a,b)=>(order[a.action]||4)-(order[b.action]||4));
+
+  const buyN  = cards.filter(c=>c.action.includes('buy')).length;
+  const holdN = cards.filter(c=>['hold','watch'].includes(c.action)).length;
+  const sellN = cards.filter(c=>c.action==='sell').length;
+  summary.innerHTML = `<div class="port-summary">
+    <span class="sum-chip all">${portfolio.length} holdings</span>
+    ${buyN?`<span class="sum-chip buy">${buyN} buy more</span>`:''}
+    ${holdN?`<span class="sum-chip hold">${holdN} hold</span>`:''}
+    ${sellN?`<span class="sum-chip sell">${sellN} sell alert</span>`:''}
+  </div>`;
+
+  list.innerHTML = cards.map(c=>c.html).join('');
+}
+
+function openAddSheet() {
+  openSheet('add-sheet');
+  document.getElementById('addSearch').value = '';
+  updateAddList('');
+}
+
+function updateAddList(q='') {
+  const ql   = q.toLowerCase();
+  const port = getPortfolio();
+  const list = document.getElementById('add-list');
+  if (!list) return;
+  const groups = [{label:'📈 Stocks',type:'stock'},{label:'🪙 Crypto',type:'crypto'},{label:'📊 ETFs',type:'etf'}];
+  let html = '';
+  groups.forEach(g => {
+    const items = picks.filter(p=>p.type===g.type && (!ql||p.name.toLowerCase().includes(ql)||p.ticker.toLowerCase().includes(ql)));
+    if (!items.length) return;
+    html += `<div class="add-group-title">${g.label}</div>`;
+    items.forEach(p => {
+      const added = port.includes(p.ticker);
+      const rec   = getRecommendation(p);
+      html += `<div class="add-item" onclick="togglePortfolio('${p.ticker}')">
+        <div class="add-item-info">
+          <span class="add-item-flag">${p.flag}</span>
+          <div>
+            <div class="add-item-name">${p.name}</div>
+            <div class="add-item-sub">${p.ticker} &nbsp; <span class="rec-badge ${rec.cls}" style="font-size:10px;padding:2px 8px">${rec.label}</span></div>
+          </div>
+        </div>
+        <div class="add-check ${added?'on':'off'}">${added?'✓':''}</div>
+      </div>`;
+    });
+  });
+  list.innerHTML = html || '<p style="color:var(--lbl3);text-align:center;padding:20px 0">No results found</p>';
+}
+function filterAddList(){ updateAddList(document.getElementById('addSearch')?.value||''); }
+
 function buildLearn() {
   const list = document.getElementById('learn-list');
   if (!list) return;
   list.innerHTML = lessons.map((l,i) => `
     <div class="lesson" id="lesson-${i}" onclick="toggleLesson(${i})">
       <div class="lesson-head">
-        <span class="lesson-emoji">${l.e}</span>
-        <div style="flex:1"><div class="lesson-title">${l.t}</div><div class="lesson-simple">${l.s}</div></div>
+        <div class="lesson-icon">${l.e}</div>
+        <div class="lesson-text">
+          <div class="lesson-title">${l.t}</div>
+          <div class="lesson-simple">${l.s}</div>
+        </div>
         <span class="lesson-chevron">›</span>
       </div>
       <div class="lesson-body">${l.b}</div>
@@ -1008,9 +1470,15 @@ function removeSaved(ticker) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
-buildFeed();
-buildDots();
-buildLearn();
+// Fetch live ML predictions first, then build UI with fresh data
+fetchLivePicks().then(() => {
+  buildFeed();
+  buildDots();
+  buildLearn();
+  renderPortfolioScreen();
+  renderLikedSection();
+  requestAnimationFrame(() => requestAnimationFrame(() => setDimensions()));
+});
 
 // Update fixed overlays on scroll
 document.getElementById('feed').addEventListener('scroll', () => {
@@ -1021,8 +1489,7 @@ document.getElementById('feed').addEventListener('scroll', () => {
   if (page && page.dataset.type === 'pick') showOverlays(page);
   else hideOverlays();
 }, {passive: true});
-// Measure nav after DOM + paint are complete
-requestAnimationFrame(() => requestAnimationFrame(() => setDimensions()));
+// (setDimensions called inside fetchLivePicks().then() above)
 document.getElementById('feed').addEventListener('scroll', updateDots, {passive:true});
 updateDots();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(()=>{});

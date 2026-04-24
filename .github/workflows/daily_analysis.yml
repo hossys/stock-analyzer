@@ -9,6 +9,8 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: write       # needed to commit picks.json back to repo
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -30,3 +32,11 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py --once
+
+      - name: Publish picks.json
+        run: |
+          git config user.name "Stockeram Bot"
+          git config user.email "action@github.com"
+          git add picks.json
+          git diff --cached --quiet || git commit -m "Update predictions $(date -u +%Y-%m-%d)"
+          git push

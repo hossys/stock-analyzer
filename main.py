@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import sqlite3
 import schedule
 import time
@@ -186,6 +187,149 @@ def _print_results(predictions: pd.DataFrame, regime: dict):
         print("⚠️  Bear market — all scores reduced 30%")
 
 
+_SECTORS = {
+    "AAPL":"Consumer Tech","MSFT":"Cloud & AI","NVDA":"Semiconductors","AMZN":"E-Commerce",
+    "GOOGL":"Search & AI","META":"Social Media","TSLA":"Electric Vehicles","JPM":"Banking",
+    "V":"Payments","UNH":"Healthcare","XOM":"Energy","LLY":"Pharma","JNJ":"Healthcare",
+    "MA":"Payments","HD":"Retail","AVGO":"Semiconductors","PG":"Consumer Goods",
+    "MRK":"Pharma","COST":"Retail","ABBV":"Biotech","CVX":"Energy","WMT":"Retail",
+    "BAC":"Banking","KO":"Beverages","PEP":"Beverages","NFLX":"Streaming","TMO":"Lab Equipment",
+    "AMD":"Semiconductors","ADBE":"Software","CRM":"Software","ORCL":"Software","CSCO":"Networking",
+    "QCOM":"Semiconductors","TXN":"Semiconductors","INTU":"Software","AMGN":"Biotech",
+    "BKNG":"Travel","PYPL":"Payments","UBER":"Mobility","COIN":"Crypto Exchange",
+    "NET":"Cybersecurity","AXP":"Financial Services","CAVA":"Restaurants","RKLB":"Aerospace",
+    "OKLO":"Nuclear Energy","IONQ":"Quantum Computing","NIO":"Electric Vehicles",
+    "RGTI":"Quantum Computing","A":"Lab Equipment","SNEX":"Financial Services",
+    "BBIO":"Biotech","RCEL":"Medical Devices","ALHC":"Healthcare",
+    "ADS.DE":"Sportswear","AIR.DE":"Aerospace & Defence","ALV.DE":"Insurance","BAS.DE":"Chemicals",
+    "BAYN.DE":"Pharma & Chemicals","BMW.DE":"Automotive","CON.DE":"Automotive","DBK.DE":"Banking",
+    "DB1.DE":"Financial Services","DHL.DE":"Logistics","DTE.DE":"Telecom","EOAN.DE":"Utilities",
+    "FRE.DE":"Healthcare","HEI.DE":"Construction","HEN3.DE":"Consumer","IFX.DE":"Semiconductors",
+    "LIN.DE":"Industrial Gases","MBG.DE":"Automotive","MRK.DE":"Pharma & Chemicals",
+    "MUV2.DE":"Insurance","RHM.DE":"Defence","RWE.DE":"Utilities","SAP.DE":"Software",
+    "SIE.DE":"Industrial","VOW3.DE":"Automotive","VNA.DE":"Real Estate","ZAL.DE":"E-Commerce",
+    "BNR.DE":"Chemicals","SHL.DE":"Medical Devices","ENR.DE":"Energy","CBK.DE":"Banking",
+    "AXA.PA":"Insurance",
+    "SPY":"US Index — 500 cos","QQQ":"US Tech Index","IVV":"US Index","VTI":"Total US Market",
+    "VWO":"Emerging Markets","IS3Q.DE":"MSCI World Quality","VWCE.DE":"Global All-World",
+    "IWDA.AS":"Developed Markets","CSPX.L":"S&P 500","GLD":"Gold","TLT":"US Bonds",
+    "BTC-USD":"Store of Value","ETH-USD":"Smart Contracts","BNB-USD":"Exchange Token",
+    "XRP-USD":"Payments","SOL-USD":"Smart Contracts","ADA-USD":"Smart Contracts",
+    "DOGE-USD":"Meme / Payments","AVAX-USD":"Smart Contracts","DOT-USD":"Interoperability",
+    "LINK-USD":"Oracle Network","XLM-USD":"Payments","ATOM-USD":"Interoperability",
+    "TRX-USD":"Smart Contracts","SHIB-USD":"Meme Token",
+}
+
+def _flag_for(ticker: str) -> str:
+    if ticker in CRYPTO:            return "🪙"
+    if ticker in DE_STOCKS or ticker.endswith(".DE"): return "🇩🇪"
+    if ticker.endswith(".PA") or ticker.endswith(".AS"): return "🇪🇺"
+    if ticker.endswith(".L"):       return "🇬🇧"
+    if ticker in ETFS and any(x in ticker for x in ["VWCE","IS3Q","IWDA","CSPX"]): return "🌍"
+    return "🇺🇸"
+
+def _currency_for(ticker: str) -> str:
+    if ticker in CRYPTO: return "$"
+    if ticker.endswith(".DE") or ticker.endswith(".PA") or ticker.endswith(".AS"): return "€"
+    return "$"
+
+def _price_targets(price: float, score: float) -> dict:
+    ret = 0.22 if score >= 65 else (0.14 if score >= 55 else (0.07 if score >= 45 else 0.03))
+    return {
+        "target": round(price * (1 + ret), 2),
+        "best":   round(price * (1 + ret * 1.6), 2),
+        "worst":  round(price * (1 - ret * 0.7), 2),
+    }
+
+def _build_reasons(row: pd.Series) -> list:
+    reasons = []
+    fund = str(row.get("fund_label") or "")
+    analyst = str(row.get("analyst_label") or "")
+    insider = str(row.get("insider_label") or "")
+    sent = str(row.get("sentiment_label") or "")
+    earn = str(row.get("earnings_note") or "")
+    if any(x in fund for x in ["💪","Excellent","Solid"]):
+        reasons.append({"t":"pos","text":f"Financial health: {fund}"})
+    if analyst and "Buy" in analyst and "Mixed" not in analyst:
+        reasons.append({"t":"pos","text":analyst})
+    if insider and "buying" in insider.lower():
+        reasons.append({"t":"pos","text":insider})
+    if "Positive" in sent:
+        reasons.append({"t":"pos","text":f"News: {sent}"})
+    if earn:
+        reasons.append({"t":"warn","text":earn})
+    if any(x in fund for x in ["Weak","Poor"]):
+        reasons.append({"t":"warn","text":f"Financial health: {fund}"})
+    if not [r for r in reasons if r["t"]=="pos"]:
+        reasons.insert(0,{"t":"pos","text":f"AI Score: {float(row.get('adj_score') or row.get('score') or 0):.1f}/10"})
+    return reasons[:3]
+
+def _build_signals(row: pd.Series) -> list:
+    out = []
+    for label, key in [("Company Health","fund_display"),("Analyst Rating","analyst_label"),
+                        ("News Sentiment","sentiment_label"),("Insider Activity","insider_label"),
+                        ("Options Market","pc_label"),("Earnings","earnings_note")]:
+        val = str(row.get(key) or "")
+        if val and val not in ("None","nan",""):
+            out.append({"l":label,"val":val})
+    return out[:6]
+
+def _export_picks_json(predictions: pd.DataFrame, regime: dict, prices: dict):
+    """Export all ML predictions as JSON for the Stockeram mobile app."""
+    picks_out = []
+    for _, row in predictions.iterrows():
+        ticker = str(row["ticker"])
+        price_s = prices.get(ticker)
+        if price_s is None or len(price_s) == 0:
+            continue
+        price = float(price_s.iloc[-1])
+        score = float(row.get("adj_score") or row.get("score") or 0)
+        targets = _price_targets(price, score)
+        signal = "buy" if score >= 55 else "watch"
+        verdict = ("Strong buy signal" if score >= 65 else
+                   "Good buy signal"   if score >= 55 else
+                   "Mixed — watch"     if score >= 45 else "Weak signals")
+        picks_out.append({
+            "ticker":       ticker,
+            "name":         TICKER_NAMES.get(ticker, ticker),
+            "type":         str(row.get("type","stock")),
+            "flag":         _flag_for(ticker),
+            "sector":       _SECTORS.get(ticker, "Global Markets"),
+            "signal":       signal,
+            "score":        round(score, 1),
+            "scoreVerdict": verdict,
+            "scoreColor":   "green" if score >= 55 else "amber",
+            "priceNow":     round(price, 2),
+            "priceTarget":  targets["target"],
+            "bestCase":     targets["best"],
+            "worstCase":    targets["worst"],
+            "currency":     _currency_for(ticker),
+            "prob1W":       round(float(row.get("prob_1W") or 0), 1),
+            "prob1M":       round(float(row.get("prob_1M") or 0), 1),
+            "prob3M":       round(float(row.get("prob_3M") or 0), 1),
+            "prob6M":       round(float(row.get("prob_6M") or 0), 1),
+            "fundLabel":    str(row.get("fund_label") or ""),
+            "sentimentLabel": str(row.get("sentiment_label") or ""),
+            "analystLabel": str(row.get("analyst_label") or ""),
+            "insiderLabel": str(row.get("insider_label") or ""),
+            "earningsNote": str(row.get("earnings_note") or ""),
+            "reasons":      _build_reasons(row),
+            "signals":      _build_signals(row),
+        })
+    output = {
+        "generated": datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
+        "market": {
+            "regime":      regime.get("regime","UNKNOWN"),
+            "spy_vs_200ma": regime.get("spy_vs_200ma",0),
+            "is_bull":     bool(regime.get("is_bull",True)),
+        },
+        "picks": picks_out,
+    }
+    with open("picks.json","w",encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False)
+    print(f"  Exported {len(picks_out)} picks → picks.json")
+
+
 def run():
     print(f"\n{'='*65}")
     print(f"  Stock Analyzer — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
@@ -248,6 +392,7 @@ def run():
     _save(predictions)
     _print_results(predictions, regime)
     send_daily_digest(predictions, regime)
+    _export_picks_json(predictions, regime, prices)
     print(f"\nDone. Next scheduled run at {DAILY_RUN_TIME}.")
 
 
