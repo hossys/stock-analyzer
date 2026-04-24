@@ -466,6 +466,8 @@ html,body{
   <div class="sh-handle"></div>
   <h3 class="sh-title" id="as-name"></h3>
   <p class="sh-sub" id="as-sub"></p>
+  <!-- Buy / Hold / Sell recommendation box (filled by openPickDetail) -->
+  <div id="as-rec" style="margin-bottom:14px"></div>
   <div class="sh-section">
     <div class="sh-section-title">📊 Price History & AI Forecast</div>
     <div class="chart-wrap" id="as-chart"></div>
@@ -1057,17 +1059,58 @@ function openRisk(page) {
 
 function openAnalysis(page) {
   const ticker = page.dataset.ticker;
-  const p = picks.find(x => x.ticker === ticker);
-  if (!p) return;
+  openPickDetail(ticker);
+}
 
-  document.getElementById('as-name').textContent = p.name;
-  document.getElementById('as-sub').textContent  = `${p.ticker} · ${p.sector} · Score ${p.score}/10`;
+function openPickDetail(ticker) {
+  const p = picks.find(x => x.ticker === ticker);
+
+  if (!p) {
+    document.getElementById('as-name').textContent = ticker;
+    document.getElementById('as-sub').textContent  = 'No ML prediction yet — runs every morning';
+    document.getElementById('as-rec').innerHTML    = `<div style="background:rgba(255,255,255,.06);border-radius:14px;padding:14px 16px;text-align:center;color:var(--lbl2);font-size:13px">Prediction data will appear after the next daily analysis run.</div>`;
+    document.getElementById('as-chart').innerHTML  = '';
+    ['p1w','p1','p3','p6'].forEach(id => {
+      const el = document.getElementById('as-'+id);
+      if (el) { el.textContent = '—'; el.className = 'pv'; }
+    });
+    document.getElementById('as-signals').innerHTML = '';
+    openSheet('analysis-sheet');
+    return;
+  }
+
+  // ── Recommendation box ──────────────────────────────────────────────────────
+  const rec       = getRecommendation(p);
+  const sellAdvice = getSellAdvice(p);
+  const upside    = Math.round((p.priceTarget / p.priceNow - 1) * 100);
+  const recBg     = rec.cls === 'buy'  ? 'rgba(48,209,88,.12)'
+                  : rec.cls === 'sell' ? 'rgba(255,69,58,.12)'
+                  :                      'rgba(255,159,10,.12)';
+  const recBorder = rec.cls === 'buy'  ? 'rgba(48,209,88,.3)'
+                  : rec.cls === 'sell' ? 'rgba(255,69,58,.3)'
+                  :                      'rgba(255,159,10,.3)';
+
+  document.getElementById('as-rec').innerHTML = `
+    <div style="background:${recBg};border:1px solid ${recBorder};border-radius:14px;padding:14px 16px">
+      <div style="font-size:20px;font-weight:800;margin-bottom:6px">${rec.label}</div>
+      ${rec.action.includes('buy') ? `
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <span style="font-size:13px;color:var(--lbl2)">Now: <strong style="color:#fff">${p.currency}${p.priceNow.toLocaleString()}</strong></span>
+          <span style="color:var(--lbl3)">→</span>
+          <span style="font-size:13px;color:var(--green)">Target: <strong>${p.currency}${p.priceTarget.toLocaleString()} (+${upside}%)</strong></span>
+        </div>` : ''}
+      ${sellAdvice ? `<div style="font-size:12px;color:var(--lbl2);line-height:1.5;border-top:.5px solid rgba(255,255,255,.1);padding-top:8px;margin-top:4px">⚠️ ${sellAdvice}</div>` : ''}
+      <div style="font-size:11px;color:var(--lbl3);margin-top:6px">AI Score: ${p.score}/10 · ${p.scoreVerdict}</div>
+    </div>`;
+
+  document.getElementById('as-name').textContent = `${p.flag} ${p.name}`;
+  document.getElementById('as-sub').textContent  = `${p.ticker} · ${p.sector}`;
   document.getElementById('as-chart').innerHTML  = buildChart(p);
 
   const pColor = v => v >= 60 ? 'green' : 'amber';
-  [['p1w',p.prob1W||55],['p1',p.prob1M],['p3',p.prob3M],['p6',p.prob6M]].forEach(([id,val]) => {
+  [['p1w', p.prob1W||55], ['p1', p.prob1M], ['p3', p.prob3M], ['p6', p.prob6M]].forEach(([id, val]) => {
     const el = document.getElementById('as-'+id);
-    if(el){ el.textContent = val + '%'; el.className = 'pv ' + pColor(val); }
+    if (el) { el.textContent = val + '%'; el.className = 'pv ' + pColor(val); }
   });
 
   document.getElementById('as-signals').innerHTML = p.signals.map(s =>
@@ -1371,7 +1414,7 @@ function renderPortfolioScreen() {
     const advice = getSellAdvice(p);
     return {
       action: rec.action,
-      html: `<div class="port-card" onclick="goToPick('${ticker}')">
+      html: `<div class="port-card" onclick="openPickDetail('${ticker}')">
         <div class="port-card-top">
           <div>
             <div class="port-card-name">${p?p.flag:'📈'} ${p?p.name:ticker}</div>
@@ -1386,7 +1429,10 @@ function renderPortfolioScreen() {
         </div>`:''}
         ${advice?`<div class="port-sell-box">⚠️ ${advice}</div>`:''}
         ${p && rec.action==='buy-more' && p.reasons?.[0]?`<div class="port-reason">Why: ${p.reasons[0].text}</div>`:''}
-        <button class="port-remove" onclick="event.stopPropagation();togglePortfolio('${ticker}')">Remove from portfolio ×</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <span style="font-size:11px;color:var(--brand);font-weight:600">Tap for full analysis →</span>
+          <button class="port-remove" onclick="event.stopPropagation();togglePortfolio('${ticker}')">Remove ×</button>
+        </div>
       </div>`
     };
   });
