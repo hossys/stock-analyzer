@@ -16,6 +16,7 @@ US_STOCKS = [
     # From user's portfolio
     "NET", "AXP", "CAVA", "RKLB", "OKLO", "IONQ", "NIO", "RGTI",
     "A", "SNEX", "BBIO", "RCEL", "ALHC",
+    "QUBT", "ATYR", "RR",
 ]
 
 DE_STOCKS = [
@@ -29,6 +30,8 @@ DE_STOCKS = [
     "CBK.DE",
     # French/EU stocks (tradeable on Xetra or available via yfinance)
     "AXA.PA",
+    # Spanish stocks
+    "ACS.MC",
 ]
 
 CRYPTO = [
@@ -37,6 +40,7 @@ CRYPTO = [
     "ADA-USD", "DOGE-USD", "AVAX-USD", "DOT-USD", "LINK-USD",
     # From user's portfolio
     "XLM-USD", "ATOM-USD", "TRX-USD", "SHIB-USD",
+    "ARB-USD", "OP-USD", "VET-USD",
 ]
 
 ETFS = [
@@ -65,6 +69,7 @@ TICKER_NAMES = {
     "IONQ": "IonQ", "NIO": "NIO", "RGTI": "Rigetti Computing",
     "A": "Agilent", "SNEX": "StoneX Group", "BBIO": "BridgeBio Pharma",
     "RCEL": "AVITA Medical", "ALHC": "Alignment Healthcare",
+    "QUBT": "Quantum Computing Inc", "ATYR": "aTyr Pharma", "RR": "Richtech Robotics",
     # German / EU
     "ADS.DE": "Adidas", "AIR.DE": "Airbus", "ALV.DE": "Allianz", "BAS.DE": "BASF",
     "BAYN.DE": "Bayer", "BMW.DE": "BMW", "CON.DE": "Continental", "DBK.DE": "Deutsche Bank",
@@ -75,13 +80,14 @@ TICKER_NAMES = {
     "RWE.DE": "RWE", "SAP.DE": "SAP", "SIE.DE": "Siemens", "VOW3.DE": "Volkswagen",
     "VNA.DE": "Vonovia", "ZAL.DE": "Zalando", "BNR.DE": "Brenntag",
     "SHL.DE": "Siemens Healthineers", "ENR.DE": "Siemens Energy",
-    "CBK.DE": "Commerzbank", "AXA.PA": "AXA",
+    "CBK.DE": "Commerzbank", "AXA.PA": "AXA", "ACS.MC": "ACS SA",
     # Crypto
     "BTC-USD": "Bitcoin", "ETH-USD": "Ethereum", "BNB-USD": "BNB",
     "XRP-USD": "XRP", "SOL-USD": "Solana", "ADA-USD": "Cardano",
     "DOGE-USD": "Dogecoin", "AVAX-USD": "Avalanche", "DOT-USD": "Polkadot",
     "LINK-USD": "Chainlink", "XLM-USD": "Stellar", "ATOM-USD": "Cosmos",
     "TRX-USD": "Tron", "SHIB-USD": "Shiba Inu",
+    "ARB-USD": "Arbitrum", "OP-USD": "Optimism", "VET-USD": "VeChain",
     # ETFs
     "SPY": "S&P 500 ETF", "QQQ": "NASDAQ 100 ETF", "IVV": "iShares S&P 500",
     "VTI": "Vanguard Total Market", "VWO": "Vanguard Emerging Markets",
@@ -117,6 +123,7 @@ SECTOR_MAP = {
     "PG": "XLP",   "KO": "XLP",  "PEP": "XLP", "COST": "XLP", "WMT": "XLP",
     "XOM": "XLE",  "CVX": "XLE",
     "RKLB": "XLI", "OKLO": "XLI",
+    "QUBT": "XLK", "RR": "XLK", "ATYR": "XLV",
 }
 
 SECTOR_ETFS = ["XLK", "XLC", "XLY", "XLF", "XLV", "XLP", "XLE", "XLI", "EWG"]
