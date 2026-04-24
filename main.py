@@ -292,7 +292,7 @@ def _export_picks_json(predictions: pd.DataFrame, regime: dict, prices: dict):
         picks_out.append({
             "ticker":       ticker,
             "name":         TICKER_NAMES.get(ticker, ticker),
-            "type":         str(row.get("type","stock")),
+            "type":         {"US Stock":"stock","German Stock":"stock","ETF":"etf","Crypto":"crypto"}.get(str(row.get("type","stock")), "stock"),
             "flag":         _flag_for(ticker),
             "sector":       _SECTORS.get(ticker, "Global Markets"),
             "signal":       signal,
