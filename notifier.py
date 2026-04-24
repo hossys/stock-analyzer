@@ -46,6 +46,7 @@ def _stock_block(rank: int, row: pd.Series) -> str:
     adj       = row.get("adj_score") or 0
     signal    = _signal_text(adj, True)
 
+    p1w = row.get("prob_1W") or 0
     p1 = row.get("prob_1M") or 0
     p3 = row.get("prob_3M") or 0
     p6 = row.get("prob_6M") or 0
@@ -62,6 +63,7 @@ def _stock_block(rank: int, row: pd.Series) -> str:
         f"Signal: *{signal}*",
         f"",
         f"📈 *How likely is it to rise?*",
+        f"  • This week  → *{p1w:.0f}%* chance of gaining ≥2%",
         f"  • In 1 month  → *{p1:.0f}%* chance of gaining ≥5%",
         f"  • In 3 months → *{p3:.0f}%* chance of gaining ≥10%",
         f"  • In 6 months → *{p6:.0f}%* chance of gaining ≥15%",

@@ -10,704 +10,1022 @@
 <meta name="apple-mobile-web-app-title" content="Stockeram">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
-  --bg:#000;--bg2:#1c1c1e;--bg3:#2c2c2e;
-  --sep:rgba(84,84,88,.35);
-  --lbl:#fff;--lbl2:rgba(235,235,245,.6);--lbl3:rgba(235,235,245,.3);
-  --blue:#0a84ff;--green:#30d158;--red:#ff453a;--orange:#ff9f0a;
-  --brand:#bf5af2;
+  --green:#30d158;--red:#ff453a;--orange:#ff9f0a;--brand:#bf5af2;
+  --lbl:#fff;--lbl2:rgba(235,235,245,.6);--lbl3:rgba(235,235,245,.28);
+  --sep:rgba(84,84,88,.35);--card:rgba(255,255,255,.07);
   --grad:linear-gradient(135deg,#bf5af2 0%,#ff375f 50%,#ff9f0a 100%);
   --st:env(safe-area-inset-top,44px);
   --sb:env(safe-area-inset-bottom,0px);
 }
 html,body{
   background:#000;color:var(--lbl);
-  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text',system-ui,sans-serif;
-  font-weight:400;line-height:1.4;-webkit-font-smoothing:antialiased;
-  overflow:hidden;height:100vh;height:100dvh;width:100vw;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;height:100%;width:100vw;
   overscroll-behavior:none;letter-spacing:-.01em;
 }
 
-/* ── Nav ── */
-.nav{
-  position:fixed;top:0;left:0;right:0;
+/* NAV — two rows: logo + filter pills */
+.nav{position:fixed;top:0;left:0;right:0;z-index:400;
   padding-top:var(--st);
-  background:rgba(0,0,0,.7);
-  backdrop-filter:blur(30px) saturate(180%);
-  -webkit-backdrop-filter:blur(30px) saturate(180%);
-  border-bottom:.5px solid var(--sep);
-  z-index:400;
-}
-.nav-inner{
-  display:flex;align-items:center;justify-content:space-between;
-  height:44px;padding:0 16px;
-}
-.nav-title{font-size:17px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:6px}
-.logo{width:24px;height:24px;background:var(--grad);border-radius:6px;display:grid;place-items:center;font-weight:900;font-size:13px;color:#fff}
-.nav-actions{display:flex;gap:18px}
-.nav-btn{background:none;border:none;color:#fff;cursor:pointer;padding:4px;display:grid;place-items:center}
-.nav-btn svg{width:22px;height:22px}
+  background:rgba(0,0,0,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:.5px solid var(--sep)}
+.nav-top{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.logo-row{display:flex;align-items:center;gap:7px;font-size:17px;font-weight:700;letter-spacing:-.02em}
+.logo{width:26px;height:26px;border-radius:7px;background:var(--grad);display:grid;place-items:center;font-weight:900;font-size:13px;color:#fff}
+.nav-btns{display:flex;gap:14px}
+.nbtn{background:none;border:none;color:#fff;cursor:pointer;padding:4px;display:grid;place-items:center}
+.nbtn svg{width:22px;height:22px}
+/* Filter row — inside nav so it's always positioned correctly */
+.nav-filter{padding:7px 16px 9px;display:flex;gap:7px;overflow-x:auto;scrollbar-width:none}
+.nav-filter::-webkit-scrollbar{display:none}
+.fpill{padding:5px 14px;border-radius:100px;background:rgba(255,255,255,.12);
+  color:var(--lbl2);font-size:13px;font-weight:600;white-space:nowrap;
+  cursor:pointer;border:none;font-family:inherit;flex-shrink:0;transition:all .2s}
+.fpill.active{background:var(--brand);color:#fff}
 
-/* ── Progress dots ── */
-.dots{
-  position:fixed;left:20px;right:20px;
-  top:calc(var(--st) + 50px);
-  z-index:350;display:flex;gap:3px;
-  transition:opacity .3s;pointer-events:none;
-}
-.dot{flex:1;height:2.5px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden}
-.dot.done{background:rgba(255,255,255,.6)}
-.dot.active{background:linear-gradient(90deg,rgba(255,255,255,.6) 30%,rgba(255,255,255,.2) 30%)}
+/* DOTS — top set by JS via --nav-bottom */
+.dots{position:fixed;z-index:350;
+  left:20px;right:20px;top:calc(var(--nav-bottom,90px) + 4px);
+  display:flex;gap:3px;pointer-events:none;transition:opacity .25s}
+.dot{flex:1;height:2px;background:rgba(255,255,255,.18);border-radius:2px;transition:background .3s}
+.dot.done{background:rgba(255,255,255,.5)}
+.dot.active{background:#fff}
 
-/* ── Feed ── */
-.feed{
-  position:fixed;inset:0;
-  overflow-y:scroll;scroll-snap-type:y mandatory;
-  -webkit-overflow-scrolling:touch;scrollbar-width:none;
-}
+/* FEED */
+.feed{position:fixed;inset:0;overflow-y:scroll;scroll-snap-type:y mandatory;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
 .feed::-webkit-scrollbar{display:none}
 
-/* ── Page ── */
+/* PAGE */
 .page{
-  height:100vh;height:100dvh;width:100%;
+  height:calc(var(--vh,1vh)*100);width:100%;
   scroll-snap-align:start;scroll-snap-stop:always;
-  position:relative;
-  padding:calc(var(--st) + 60px) 20px calc(var(--sb) + 90px);
-  overflow:hidden;display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
 }
-.page::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:50%;
-  background:radial-gradient(ellipse at top,var(--glow,rgba(191,90,242,.25)) 0%,transparent 70%);
-  pointer-events:none;z-index:0;
+.page::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 100% 45% at 50% 0%,var(--glow,rgba(191,90,242,.18)) 0%,transparent 60%)}
+.page.buy{--glow:rgba(48,209,88,.2)}
+.page.watch{--glow:rgba(255,159,10,.17)}
+.page > *{position:relative;z-index:1}
+
+/* INTRO */
+.intro-wrap{position:absolute;left:0;right:0;bottom:0;
+  top:var(--nav-bottom,90px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:10px 24px 60px;gap:0}
+.i-day{font-size:11px;font-weight:600;color:var(--lbl2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:14px}
+.i-title{font-size:56px;font-weight:800;letter-spacing:-.04em;line-height:.95;margin-bottom:12px;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.i-date{font-size:19px;font-weight:600;letter-spacing:-.02em;margin-bottom:20px}
+.i-sub{font-size:15px;color:var(--lbl2);max-width:270px;line-height:1.45;margin-bottom:24px}
+.mkt-pill{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;
+  background:rgba(48,209,88,.12);color:var(--green);border-radius:100px;font-size:13px;font-weight:600}
+.mkt-pill::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 9px var(--green);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(1.5)}}
+.swipe-cue{position:absolute;bottom:calc(var(--sb)+62px);left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  color:var(--lbl3);font-size:11px;font-weight:500;animation:bob 2.2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0);opacity:.4}50%{transform:translateX(-50%) translateY(-6px);opacity:.9}}
+
+/* PICK SCROLL — right padding leaves room for fixed action buttons */
+.pscroll{
+  position:absolute;
+  top:var(--nav-bottom,90px);
+  left:0;right:0;bottom:0;
+  padding:8px 16px 175px;
+  overflow:hidden;
+  display:flex;flex-direction:column;gap:8px;
 }
-.page.buy{--glow:rgba(48,209,88,.22)}
-.page.watch{--glow:rgba(255,159,10,.18)}
-.page>*{position:relative;z-index:1}
+.why-section{display:flex;flex-direction:column;gap:6px}
+.why-list{display:flex;flex-direction:column;gap:6px}
 
-/* ── Intro ── */
-.page.intro{justify-content:center;align-items:center;text-align:center}
-.page.intro::before{background:radial-gradient(ellipse at center,rgba(191,90,242,.35) 0%,transparent 70%);height:100%}
-.intro-date{font-size:13px;font-weight:600;color:var(--lbl2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:16px}
-.intro-title{font-size:64px;font-weight:800;letter-spacing:-.04em;line-height:.95;margin-bottom:14px;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.intro-date-big{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:28px}
-.intro-sub{font-size:17px;color:var(--lbl2);max-width:300px;line-height:1.45;margin-bottom:36px}
-.market-pill{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:rgba(48,209,88,.15);color:var(--green);border-radius:100px;font-size:14px;font-weight:600}
-.market-pill::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);animation:pulse 2s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
-.scroll-cue{position:absolute;bottom:calc(var(--sb)+130px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--lbl2);font-size:13px;font-weight:500;animation:bounce 2s ease-in-out infinite}
-@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0);opacity:.5}50%{transform:translateX(-50%) translateY(-8px);opacity:1}}
+/* ── ACTION BAR — two-row fixed bottom bar (Revolut/Coinbase pattern) ─────────
+   Row 1: Primary CTA (full width)
+   Row 2: 4 equal icon buttons
+   position:fixed — impossible to be hidden behind tab bar or phone chrome.  */
+.action-bar{
+  position:fixed;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 57px);
+  left:16px;right:16px;
+  z-index:250;display:none;flex-direction:column;gap:8px;
+}
+.ab-cta{
+  width:100%;height:50px;
+  background:#fff;color:#000;border:none;border-radius:14px;
+  font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  letter-spacing:-.01em;
+}
+.ab-cta:active{opacity:.85;transform:scale(.98)}
+.ab-icons{display:flex;gap:8px}
+.ab-icon{
+  flex:1;height:44px;
+  border-radius:12px;
+  background:rgba(255,255,255,.1);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:.5px solid rgba(255,255,255,.1);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;color:rgba(255,255,255,.85);cursor:pointer;
+  font-family:inherit;font-size:9px;font-weight:600;
+}
+.ab-icon svg{width:18px;height:18px;stroke-width:2}
+.ab-icon:active{transform:scale(.9);opacity:.8}
+.ab-icon.saved svg{fill:var(--brand);stroke:var(--brand)}
+.ab-icon.liked svg{fill:var(--red);stroke:var(--red)}
 
-/* ── Pick header ── */
-.pick-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.rank-chip{font-size:13px;font-weight:600;color:var(--lbl2);padding:6px 12px;background:rgba(255,255,255,.1);border-radius:100px;font-variant-numeric:tabular-nums}
-.signal-chip{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:7px 14px;border-radius:100px;display:flex;align-items:center;gap:6px}
-.signal-chip.buy{background:rgba(48,209,88,.15);color:var(--green)}
-.signal-chip.watch{background:rgba(255,159,10,.15);color:var(--orange)}
-.signal-chip::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+/* CARDS */
+.rank-chip{display:flex;align-items:center;justify-content:space-between}
+.rchip{font-size:11px;font-weight:600;color:var(--lbl2);padding:5px 11px;background:rgba(255,255,255,.1);border-radius:100px;font-variant-numeric:tabular-nums}
+.schip{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:5px 12px;border-radius:100px;display:flex;align-items:center;gap:5px}
+.schip.buy{background:rgba(48,209,88,.15);color:var(--green)}
+.schip.watch{background:rgba(255,159,10,.15);color:var(--orange)}
+.schip::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
 
-/* ── Stock ID ── */
-.stock-id{margin-bottom:16px}
-.stock-name{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.stock-flag{font-size:22px}
-.stock-meta{display:flex;align-items:center;gap:8px;color:var(--lbl2);font-size:13px;font-weight:500}
-.ticker{font-family:'SF Mono',Menlo,monospace;font-weight:600;color:var(--lbl);font-size:12px}
-.sep-dot{width:3px;height:3px;border-radius:50%;background:var(--lbl3)}
+.stock-id{display:flex;flex-direction:column;gap:3px}
+.sname{font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1.05;display:flex;align-items:center;gap:8px}
+.sflag{font-size:24px}
+.smeta{display:flex;align-items:center;gap:6px;color:var(--lbl2);font-size:14px;font-weight:600}
+.sticker{font-family:'SF Mono',Menlo,monospace;font-weight:600;color:var(--lbl);font-size:11px}
+.sdot{width:3px;height:3px;border-radius:50%;background:var(--lbl3)}
 
-/* ── Price hero ── */
-.price-hero{background:rgba(255,255,255,.06);border-radius:20px;padding:18px;margin-bottom:14px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-.price-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--lbl2);margin-bottom:8px}
-.price-line{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px}
-.price-now{font-size:24px;font-weight:700;color:var(--lbl2);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.price-arrow{color:var(--lbl3);font-size:20px}
-.price-target{font-size:32px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
-.price-upside{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(48,209,88,.15);color:var(--green);border-radius:100px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
-.price-horizon{font-size:12px;color:var(--lbl3);margin-top:4px}
+.price-card{background:var(--card);border-radius:16px;padding:12px 14px}
+.clabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--lbl2);margin-bottom:7px}
+.pline{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.pnow{font-size:22px;font-weight:700;color:var(--lbl2);font-variant-numeric:tabular-nums}
+.parr{color:var(--lbl3);font-size:18px}
+.ptgt{font-size:30px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.pupside{display:inline-flex;padding:4px 10px;background:rgba(48,209,88,.15);color:var(--green);border-radius:100px;font-size:13px;font-weight:700}
+.phint{font-size:11px;color:var(--lbl3);margin-top:4px}
 
-/* ── Score ── */
-.score-row{display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(255,255,255,.06);border-radius:16px;margin-bottom:14px}
-.score-wrap{position:relative;width:56px;height:56px;flex-shrink:0}
-.score-svg{width:100%;height:100%;transform:rotate(-90deg)}
-.score-bg,.score-fg{fill:none;stroke-width:5}
-.score-bg{stroke:rgba(255,255,255,.1)}
-.score-fg{stroke-linecap:round}
-.score-num{position:absolute;inset:0;display:grid;place-items:center;font-size:16px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.score-info{flex:1;min-width:0}
-.score-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--lbl2);margin-bottom:2px}
-.score-verdict{font-size:15px;font-weight:700;letter-spacing:-.01em}
-.score-verdict.green{color:var(--green)}
-.score-verdict.amber{color:var(--orange)}
+/* Score + Invest row */
+.si-row{display:flex;gap:8px}
+.score-card{flex:1;background:var(--card);border-radius:16px;padding:11px 12px;display:flex;align-items:center;gap:9px}
+.scircle-wrap{position:relative;width:48px;height:48px;flex-shrink:0}
+.scircle{width:100%;height:100%;transform:rotate(-90deg)}
+.sbg,.sfg{fill:none;stroke-width:5}
+.sbg{stroke:rgba(255,255,255,.1)}
+.sfg{stroke-linecap:round}
+.snum{position:absolute;inset:0;display:grid;place-items:center;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+.slbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--lbl2);margin-bottom:2px}
+.sverdict{font-size:12px;font-weight:700}
+.sverdict.green{color:var(--green)}
+.sverdict.amber{color:var(--orange)}
 
-/* ── Invest ── */
-.invest{background:rgba(255,255,255,.06);border-radius:16px;padding:14px 16px;margin-bottom:14px}
-.invest-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--lbl2);margin-bottom:6px}
-.invest-line{display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:500;letter-spacing:-.01em;margin-bottom:2px}
-.invest-line.main{font-size:18px;font-weight:700;margin-top:6px;padding-top:10px;border-top:.5px solid rgba(255,255,255,.1)}
-.invest-from{color:var(--lbl2)}
-.invest-arrow{color:var(--lbl3);font-size:14px;margin:0 8px}
-.invest-to{font-weight:700;color:var(--green);font-variant-numeric:tabular-nums}
+.invest-card{flex:1;background:var(--card);border-radius:16px;padding:12px 13px;display:flex;flex-direction:column;justify-content:center}
+.invlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--lbl2);margin-bottom:7px}
+.invline{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.invfrom{color:var(--lbl2)}.invarr{color:var(--lbl3);font-size:11px}.invto{color:var(--green)}
 
-/* ── Why ── */
-.why{margin-bottom:14px}
-.why-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--lbl2);margin-bottom:8px;padding-left:4px}
-.why-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,.06);border-radius:12px;margin-bottom:6px;font-size:14px;font-weight:500;letter-spacing:-.01em}
-.why-icon{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
-.why-icon.pos{background:var(--green)}
-.why-icon.warn{background:var(--orange)}
-.why-icon svg{width:12px;height:12px;stroke:#fff;stroke-width:3;fill:none}
+/* Why list */
+.why-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--lbl2);margin-bottom:5px}
+.why-list{display:flex;flex-direction:column;gap:5px}
+.why-item{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--card);border-radius:12px;font-size:14px;font-weight:500;line-height:1.3}
+.wicon{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+.wicon.pos{background:var(--green)}.wicon.warn{background:var(--orange)}
+.wicon svg{width:10px;height:10px;stroke:#fff;stroke-width:3;fill:none}
 
-/* ── Risk btn ── */
-.risk-btn{width:100%;background:transparent;border:.5px solid rgba(255,255,255,.2);color:var(--lbl2);padding:11px;border-radius:12px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:14px}
-.risk-btn svg{width:14px;height:14px}
-
-/* ── Side actions ── */
-.side-actions{position:absolute;right:12px;bottom:calc(var(--sb)+200px);display:flex;flex-direction:column;gap:14px;z-index:50}
-.action{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
-.action-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);display:grid;place-items:center;color:#fff;border:.5px solid rgba(255,255,255,.08);transition:transform .2s}
-.action-btn svg{width:22px;height:22px;stroke-width:2;transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
-.action:active .action-btn{transform:scale(.9)}
-.action.saved .action-btn{background:var(--brand);border-color:var(--brand)}
-.action.saved .action-btn svg{fill:#fff;stroke:#fff}
-.action.liked .action-btn svg{fill:var(--red);stroke:var(--red)}
-.action-count{font-size:11px;font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);font-variant-numeric:tabular-nums}
-
-/* ── CTA ── */
-.cta{position:absolute;bottom:calc(var(--sb)+90px);left:16px;right:16px;display:flex;gap:10px;z-index:200}
-.btn-primary{flex:1;background:#fff;color:#000;border:none;padding:14px;border-radius:14px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;letter-spacing:-.01em;transition:transform .15s}
-.btn-primary:active{transform:scale(.97)}
-.btn-icon{background:rgba(255,255,255,.12);color:#fff;border:.5px solid rgba(255,255,255,.08);width:48px;height:48px;border-radius:14px;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-.btn-icon svg{width:20px;height:20px}
-
-/* ── Tab bar ── */
-.tab-bar{position:fixed;bottom:0;left:0;right:0;height:calc(49px + var(--sb));background:rgba(0,0,0,.7);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);border-top:.5px solid var(--sep);padding:8px 0 var(--sb);display:flex;justify-content:space-around;align-items:flex-start;z-index:300}
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;color:var(--lbl3);cursor:pointer}
+/* TAB BAR */
+.tab-bar{position:fixed;bottom:0;left:0;right:0;z-index:300;
+  height:calc(49px + var(--sb));
+  background:rgba(0,0,0,.85);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
+  border-top:.5px solid var(--sep);padding:7px 0 var(--sb);
+  display:flex;justify-content:space-around;align-items:flex-start}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;color:var(--lbl3);cursor:pointer}
 .tab.active{color:var(--brand)}
-.tab svg{width:28px;height:28px}
-.tab-label{font-size:10px;font-weight:500}
+.tab svg{width:26px;height:26px}
+.tlbl{font-size:10px;font-weight:500}
 
-/* ── Home indicator ── */
-.home-ind{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;background:#fff;border-radius:3px;z-index:999;pointer-events:none}
+.home-ind{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:130px;height:5px;background:#fff;border-radius:3px;z-index:999;pointer-events:none}
 
-/* ── Sheet ── */
-.sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:800;pointer-events:none;transition:background .3s}
-.sheet-backdrop.open{background:rgba(0,0,0,.5);pointer-events:auto}
-.sheet{position:fixed;bottom:0;left:0;right:0;background:#1c1c1e;border-radius:22px 22px 0 0;z-index:900;padding:12px 20px calc(30px + var(--sb));transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1);max-height:75vh;overflow-y:auto}
+/* SHEETS */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:800;pointer-events:none;transition:background .3s}
+.backdrop.open{background:rgba(0,0,0,.6);pointer-events:auto}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:#1c1c1e;border-radius:22px 22px 0 0;
+  z-index:900;padding:10px 18px calc(28px + var(--sb));
+  transform:translateY(102%);transition:transform .36s cubic-bezier(.32,.72,0,1);
+  max-height:88vh;overflow-y:auto}
 .sheet.open{transform:translateY(0)}
-.sheet-handle{width:36px;height:5px;background:rgba(255,255,255,.3);border-radius:3px;margin:0 auto 18px}
-.sheet-title{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
-.sheet-sub{font-size:14px;color:var(--lbl2);margin-bottom:20px}
-.scenario{padding:14px 16px;border-radius:14px;margin-bottom:8px}
-.scenario.best{background:rgba(48,209,88,.1)}
-.scenario.likely{background:rgba(255,255,255,.06)}
-.scenario.worst{background:rgba(255,69,58,.1)}
-.scenario-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.scenario-lbl{font-size:13px;font-weight:700;letter-spacing:-.01em}
-.scenario.best .scenario-lbl{color:var(--green)}
-.scenario.worst .scenario-lbl{color:var(--red)}
-.scenario-val{font-size:18px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.scenario.best .scenario-val{color:var(--green)}
-.scenario.worst .scenario-val{color:var(--red)}
-.scenario-desc{font-size:12px;color:var(--lbl2);line-height:1.4}
-.sheet-note{margin-top:16px;padding:12px 14px;background:rgba(255,159,10,.1);border-radius:12px;font-size:12px;color:var(--lbl2);line-height:1.5;display:flex;gap:10px}
-.sheet-note-icon{color:var(--orange);flex-shrink:0;margin-top:1px}
+.sh-handle{width:36px;height:5px;background:rgba(255,255,255,.22);border-radius:3px;margin:0 auto 16px}
+.sh-title{font-size:21px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+.sh-sub{font-size:13px;color:var(--lbl2);margin-bottom:16px}
 
-/* ── Outro ── */
+/* RISK SHEET */
+.scenario{padding:12px 14px;border-radius:13px;margin-bottom:7px}
+.scenario.best{background:rgba(48,209,88,.1)}.scenario.likely{background:rgba(255,255,255,.06)}.scenario.worst{background:rgba(255,69,58,.1)}
+.sc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.sc-lbl{font-size:13px;font-weight:700}
+.scenario.best .sc-lbl{color:var(--green)}.scenario.worst .sc-lbl{color:var(--red)}
+.sc-val{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.scenario.best .sc-val{color:var(--green)}.scenario.worst .sc-val{color:var(--red)}
+.sc-desc{font-size:11px;color:var(--lbl2);line-height:1.4}
+
+/* ANALYSIS SHEET */
+.sh-section{margin-bottom:18px}
+.sh-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--lbl2);margin-bottom:10px}
+.chart-wrap{background:rgba(255,255,255,.04);border-radius:16px;padding:12px;overflow:hidden}
+.prob-row{display:flex;gap:8px}
+.prob-card{flex:1;background:rgba(255,255,255,.06);border-radius:12px;padding:10px 8px;text-align:center}
+.ph{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--lbl2);margin-bottom:4px}
+.pv{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.pv.green{color:var(--green)}.pv.amber{color:var(--orange)}
+.ptlabel{font-size:10px;color:var(--lbl3);margin-top:2px}
+.sig-list{display:flex;flex-direction:column;gap:6px}
+.sig-item{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:rgba(255,255,255,.06);border-radius:11px}
+.sig-lbl{font-size:13px;color:var(--lbl2);font-weight:500}
+.sig-val{font-size:13px;font-weight:600;text-align:right;max-width:58%}
+.sh-note{margin-top:14px;padding:11px 13px;background:rgba(255,159,10,.08);border-radius:11px;font-size:11px;color:var(--lbl2);line-height:1.5;display:flex;gap:8px}
+.sh-note svg{width:13px;height:13px;color:var(--orange);flex-shrink:0;margin-top:1px}
+
+/* OUTRO */
 .page.outro{justify-content:center;align-items:center;text-align:center}
-.page.outro::before{background:radial-gradient(ellipse at center,rgba(48,209,88,.2) 0%,transparent 70%);height:100%}
-.outro-icon{width:80px;height:80px;background:linear-gradient(135deg,var(--green),#34c759);border-radius:24px;display:grid;place-items:center;margin-bottom:22px;box-shadow:0 10px 40px rgba(48,209,88,.35)}
-.outro-icon svg{width:40px;height:40px;stroke:#fff;stroke-width:3;fill:none}
-.outro-title{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-bottom:10px}
-.outro-sub{font-size:16px;color:var(--lbl2);max-width:280px;margin-bottom:30px;line-height:1.45}
-.outro-btn{background:var(--grad);color:#fff;border:none;padding:14px 28px;border-radius:100px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 10px 30px rgba(191,90,242,.35)}
-.outro-disc{font-size:11px;color:var(--lbl3);max-width:280px;margin-top:24px;line-height:1.5}
+.page.outro::before{background:radial-gradient(ellipse at center,rgba(48,209,88,.17) 0%,transparent 65%);inset:0}
+.outro-inner{position:absolute;left:0;right:0;bottom:0;
+  top:var(--nav-bottom,90px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:10px 28px 80px;z-index:1;text-align:center}
+.oicon{width:70px;height:70px;background:linear-gradient(135deg,var(--green),#34c759);border-radius:22px;display:grid;place-items:center;margin-bottom:18px;box-shadow:0 8px 32px rgba(48,209,88,.28)}
+.oicon svg{width:34px;height:34px;stroke:#fff;stroke-width:3;fill:none}
+.otitle{font-size:28px;font-weight:800;letter-spacing:-.03em;margin-bottom:8px}
+.osub{font-size:14px;color:var(--lbl2);max-width:255px;margin-bottom:24px;line-height:1.45}
+.obtn{background:var(--grad);color:#fff;border:none;padding:13px 24px;border-radius:100px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.odisc{font-size:10px;color:var(--lbl3);max-width:280px;margin-top:18px;line-height:1.5}
 
-/* ── Placeholder screens ── */
-.screen{position:fixed;inset:0;background:#000;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 30px}
+/* SCREENS */
+.screen{position:fixed;inset:0;background:#000;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 28px calc(60px + var(--sb))}
 .screen.active{display:flex}
-.screen-title{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-bottom:12px;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.screen-sub{font-size:16px;color:var(--lbl2);line-height:1.5;max-width:280px}
-.saved-list{width:100%;max-width:360px;margin-top:24px;text-align:left}
-.saved-item{padding:14px 16px;background:rgba(255,255,255,.06);border-radius:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
-.saved-item-name{font-weight:700;font-size:16px}
-.saved-item-ticker{font-size:12px;color:var(--lbl2);font-family:'SF Mono',Menlo,monospace}
-.saved-empty{font-size:15px;color:var(--lbl3);margin-top:24px}
+.scr-title{font-size:28px;font-weight:800;letter-spacing:-.03em;margin-bottom:10px;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.scr-sub{font-size:14px;color:var(--lbl2);line-height:1.5;max-width:270px}
+.saved-list{width:100%;max-width:380px;margin-top:18px;text-align:left;overflow-y:auto;max-height:50vh}
+.sitem{padding:12px 14px;background:rgba(255,255,255,.06);border-radius:13px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.sname{font-weight:700;font-size:15px}.stick{font-size:11px;color:var(--lbl2);font-family:'SF Mono',Menlo,monospace;margin-top:2px}
+.rmbtn{background:none;border:none;color:var(--lbl3);font-size:22px;cursor:pointer;padding:2px 8px}
+.saved-empty{font-size:13px;color:var(--lbl3);margin-top:16px;line-height:1.6}
+/* Learn */
+.learn-list{width:100%;max-width:420px;overflow-y:auto;max-height:calc(var(--vh,1vh)*100 - 180px);padding-bottom:20px}
+.lesson{background:rgba(255,255,255,.06);border-radius:16px;margin-bottom:10px;overflow:hidden;cursor:pointer}
+.lesson-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+.lesson-emoji{font-size:22px;margin-right:10px}
+.lesson-title{font-size:15px;font-weight:700;flex:1}
+.lesson-simple{font-size:12px;color:var(--lbl2);margin-top:2px}
+.lesson-chevron{font-size:18px;color:var(--lbl3);transition:transform .2s}
+.lesson.open .lesson-chevron{transform:rotate(90deg)}
+.lesson-body{display:none;padding:0 16px 14px;font-size:13px;color:var(--lbl2);line-height:1.6;border-top:.5px solid rgba(255,255,255,.08)}
+.lesson.open .lesson-body{display:block}
 </style>
 </head>
 <body>
 
 <svg width="0" height="0" style="position:absolute">
   <defs>
-    <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#30d158"/><stop offset="100%" stop-color="#bf5af2"/>
+    <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#bf5af2"/><stop offset="100%" stop-color="#30d158"/>
     </linearGradient>
-    <linearGradient id="sa" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="sa" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#ff9f0a"/><stop offset="100%" stop-color="#ff375f"/>
     </linearGradient>
   </defs>
 </svg>
 
-<!-- Nav -->
-<nav class="nav">
-  <div class="nav-inner">
-    <div class="nav-title">
-      <div class="logo">S</div>
-      <span>Stockeram</span>
+<!-- Nav with filter built in -->
+<nav class="nav" id="nav">
+  <div class="nav-top">
+    <div class="logo-row"><div class="logo">S</div>Stockeram</div>
+    <div class="nav-btns">
+      <button class="nbtn" onclick="switchTab('saved')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+      <button class="nbtn" onclick="switchTab('profile')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
     </div>
-    <div class="nav-actions">
-      <button class="nav-btn" onclick="switchTab('saved')" aria-label="Saved">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-      </button>
-      <button class="nav-btn" onclick="switchTab('profile')" aria-label="Profile">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      </button>
-    </div>
+  </div>
+  <div class="nav-filter" id="nav-filter">
+    <button class="fpill active" data-filter="all"    onclick="applyFilter('all')">🌍 All</button>
+    <button class="fpill"        data-filter="stock"  onclick="applyFilter('stock')">📈 Stocks</button>
+    <button class="fpill"        data-filter="crypto" onclick="applyFilter('crypto')">🪙 Crypto</button>
+    <button class="fpill"        data-filter="etf"    onclick="applyFilter('etf')">📊 ETFs</button>
   </div>
 </nav>
 
-<!-- Progress dots -->
 <div class="dots" id="dots"></div>
-
-<!-- Feed -->
 <div class="feed" id="feed"></div>
 
 <!-- Tab bar -->
 <div class="tab-bar">
-  <div class="tab active" data-tab="today" onclick="switchTab('today')">
-    <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 9v13h20V9L12 2zm0 2.47L20 11v9H4v-9l8-6.53z"/></svg>
-    <span class="tab-label">Today</span>
-  </div>
-  <div class="tab" data-tab="explore" onclick="switchTab('explore')">
-    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <span class="tab-label">Explore</span>
-  </div>
-  <div class="tab" data-tab="saved" onclick="switchTab('saved')">
-    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-    <span class="tab-label">Saved</span>
-  </div>
-  <div class="tab" data-tab="learn" onclick="switchTab('learn')">
-    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-    <span class="tab-label">Learn</span>
-  </div>
-  <div class="tab" data-tab="profile" onclick="switchTab('profile')">
-    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-    <span class="tab-label">Profile</span>
-  </div>
+  <div class="tab active" data-tab="today" onclick="switchTab('today')"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 9v13h20V9L12 2zm0 2.47L20 11v9H4v-9l8-6.53z"/></svg><span class="tlbl">Today</span></div>
+  <div class="tab" data-tab="explore" onclick="switchTab('explore')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="tlbl">Explore</span></div>
+  <div class="tab" data-tab="saved" onclick="switchTab('saved')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><span class="tlbl">Saved</span></div>
+  <div class="tab" data-tab="learn" onclick="switchTab('learn')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg><span class="tlbl">Learn</span></div>
+  <div class="tab" data-tab="profile" onclick="switchTab('profile')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="tlbl">Profile</span></div>
 </div>
-
 <div class="home-ind"></div>
 
+<!-- Two-row action bar: CTA + 4 actions. Fixed above tab bar. -->
+<div class="action-bar" id="actionBar">
+  <button class="ab-cta" onclick="handleGlobalAnalysis()">
+    Full analysis
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+  <div class="ab-icons">
+    <button class="ab-icon" id="gSave" onclick="handleGlobalSave()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      <span>Save</span>
+    </button>
+    <button class="ab-icon" id="gLike" onclick="handleGlobalLike()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      <span id="gLikeCount">Like</span>
+    </button>
+    <button class="ab-icon" onclick="handleGlobalShare()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      <span>Share</span>
+    </button>
+    <button class="ab-icon" onclick="handleGlobalRisk()">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>Risks</span>
+    </button>
+  </div>
+</div>
+
 <!-- Placeholder screens -->
-<div class="screen" id="screen-explore">
-  <div class="screen-title">Explore</div>
-  <p class="screen-sub">Search stocks, sectors, and crypto. Coming soon — stay tuned.</p>
+<div class="screen" id="screen-explore"><div class="scr-title">Explore</div><p class="scr-sub">Search any stock, sector, or crypto. Coming soon.</p></div>
+<div class="screen" id="screen-saved"><div class="scr-title">Saved</div><div class="saved-list" id="saved-list"></div></div>
+<div class="screen" id="screen-learn" style="justify-content:flex-start;padding-top:calc(var(--st)+100px)">
+  <div class="scr-title" style="margin-bottom:6px">Learn</div>
+  <p style="font-size:13px;color:var(--lbl2);margin-bottom:16px">Everything in the app — explained simply.</p>
+  <div class="learn-list" id="learn-list"></div>
+</div>
+<div class="screen" id="screen-profile"><div class="scr-title">Profile</div><p class="scr-sub">Settings and performance history. Coming soon.</p></div>
+
+<!-- Backdrop -->
+<div class="backdrop" id="backdrop" onclick="closeAll()"></div>
+
+<!-- Risk sheet -->
+<div class="sheet" id="risk-sheet">
+  <div class="sh-handle"></div>
+  <h3 class="sh-title" id="rs-name"></h3>
+  <p class="sh-sub">If you invest <strong id="rs-amt"></strong> today — 12-month scenarios:</p>
+  <div class="scenario best"><div class="sc-head"><span class="sc-lbl">🚀 Best case</span><span class="sc-val" id="rs-best"></span></div><p class="sc-desc">Strong growth, positive news and favorable market conditions</p></div>
+  <div class="scenario likely"><div class="sc-head"><span class="sc-lbl">🎯 Most likely</span><span class="sc-val" id="rs-likely"></span></div><p class="sc-desc">The outcome our AI estimates based on all current signals</p></div>
+  <div class="scenario worst"><div class="sc-head"><span class="sc-lbl">📉 Worst case</span><span class="sc-val" id="rs-worst"></span></div><p class="sc-desc">Market downturn, negative news or poor earnings</p></div>
+  <div class="sh-note"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>This is AI-generated educational analysis, not financial advice.</span></div>
 </div>
 
-<div class="screen" id="screen-saved">
-  <div class="screen-title">Saved</div>
-  <div class="saved-list" id="saved-list"></div>
-</div>
-
-<div class="screen" id="screen-learn">
-  <div class="screen-title">Learn</div>
-  <p class="screen-sub">Bite-sized lessons on investing, technical analysis, and how our AI works. Coming soon.</p>
-</div>
-
-<div class="screen" id="screen-profile">
-  <div class="screen-title">Profile</div>
-  <p class="screen-sub">Your settings, notification preferences, and performance tracking. Coming soon.</p>
-</div>
-
-<!-- Risk Sheet -->
-<div class="sheet-backdrop" id="backdrop" onclick="closeSheet()"></div>
-<div class="sheet" id="sheet">
-  <div class="sheet-handle"></div>
-  <h3 class="sheet-title" id="sh-name"></h3>
-  <p class="sheet-sub">If you invest <strong id="sh-amount"></strong> today — possible outcomes in 12 months:</p>
-  <div class="scenario best">
-    <div class="scenario-head"><span class="scenario-lbl">🚀 Best case</span><span class="scenario-val" id="sh-best"></span></div>
-    <p class="scenario-desc">Strong growth, positive news and a favorable market environment</p>
+<!-- Full analysis sheet -->
+<div class="sheet" id="analysis-sheet">
+  <div class="sh-handle"></div>
+  <h3 class="sh-title" id="as-name"></h3>
+  <p class="sh-sub" id="as-sub"></p>
+  <div class="sh-section">
+    <div class="sh-section-title">📊 Price History & AI Forecast</div>
+    <div class="chart-wrap" id="as-chart"></div>
   </div>
-  <div class="scenario likely">
-    <div class="scenario-head"><span class="scenario-lbl">🎯 Most likely</span><span class="scenario-val" id="sh-likely"></span></div>
-    <p class="scenario-desc">The outcome our AI estimates based on current signals</p>
+  <div class="sh-section">
+    <div class="sh-section-title">📈 Probability of Rising</div>
+    <div class="prob-row" style="gap:6px">
+      <div class="prob-card"><div class="ph">1 Week</div><div class="pv" id="as-p1w"></div><div class="ptlabel">+2%</div></div>
+      <div class="prob-card"><div class="ph">1 Month</div><div class="pv" id="as-p1"></div><div class="ptlabel">+5%</div></div>
+      <div class="prob-card"><div class="ph">3 Months</div><div class="pv" id="as-p3"></div><div class="ptlabel">+10%</div></div>
+      <div class="prob-card"><div class="ph">6 Months</div><div class="pv" id="as-p6"></div><div class="ptlabel">+15%</div></div>
+    </div>
   </div>
-  <div class="scenario worst">
-    <div class="scenario-head"><span class="scenario-lbl">📉 Worst case</span><span class="scenario-val" id="sh-worst"></span></div>
-    <p class="scenario-desc">Market downturn, negative news or poor earnings results</p>
+  <div class="sh-section">
+    <div class="sh-section-title">🔍 All Signals</div>
+    <div class="sig-list" id="as-signals"></div>
   </div>
-  <div class="sheet-note">
-    <svg class="sheet-note-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-    <span>Stock prices can't be predicted with certainty. This is AI-generated educational analysis, not financial advice.</span>
-  </div>
+  <div class="sh-note"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Educational content only. Not investment advice. Never invest more than you can afford to lose.</span></div>
 </div>
 
 <script>
-// ── Data ──────────────────────────────────────────────────────────────────────
-// In production: fetch('/api/picks') and replace this array with the response
+// ── VIEWPORT + NAV FIX (Safari iOS) ──────────────────────────────────────────
+function setDimensions() {
+  document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+  // Double RAF: Safari must finish painting before getBoundingClientRect is reliable
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const nav = document.getElementById('nav');
+    if (!nav) return;
+    const bottom = Math.ceil(nav.getBoundingClientRect().bottom);
+    if (bottom > 20) { // guard against 0 during early render
+      document.documentElement.style.setProperty('--nav-bottom', `${bottom}px`);
+    }
+  }));
+}
+setDimensions();
+window.addEventListener('resize', setDimensions);
+
+// ── DATA ─────────────────────────────────────────────────────────────────────
 const META = {
-  date: new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
-  weekday: new Date().toLocaleDateString('en-GB',{weekday:'long'}),
-  market: 'S&P +7.0% — Healthy 🟢',
+  day:  new Date().toLocaleDateString('en-GB',{weekday:'long'}),
+  date: new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}),
+  market: 'S&P 500 +7.0% · Healthy',
 };
 
-const picks = [
-  {
-    rank:1, signal:'buy',
-    name:'UnitedHealth', flag:'🇺🇸', ticker:'UNH', sector:'Healthcare',
-    priceNow:485, priceTarget:540, bestCase:590, worstCase:435, currency:'€',
-    score:8.5, scoreVerdict:'Strong buy signal', scoreColor:'green',
-    reasons:[
-      {type:'pos',text:'Excellent financial health (F-Score 8/9)'},
-      {type:'pos',text:'Executives buying their own shares'},
-      {type:'pos',text:'23 of 28 analysts recommend Buy'},
-    ]
-  },
-  {
-    rank:2, signal:'buy',
-    name:'SAP', flag:'🇩🇪', ticker:'SAP.DE', sector:'Software',
-    priceNow:195, priceTarget:214, bestCase:230, worstCase:178, currency:'€',
-    score:7.8, scoreVerdict:'Good buy signal', scoreColor:'green',
-    reasons:[
-      {type:'pos',text:'Excellent financial health'},
-      {type:'pos',text:'22 of 28 analysts recommend Buy'},
-      {type:'warn',text:'Price slightly elevated — consider waiting for a small dip'},
-    ]
-  },
-  {
-    rank:3, signal:'buy',
-    name:'Deutsche Telekom', flag:'🇩🇪', ticker:'DTE.DE', sector:'Telecom',
-    priceNow:32.50, priceTarget:38, bestCase:42, worstCase:29, currency:'€',
-    score:9.0, scoreVerdict:'Strong buy signal', scoreColor:'green',
-    reasons:[
-      {type:'pos',text:'All 18 analysts rate Strong Buy'},
-      {type:'pos',text:'Solid financial health'},
-      {type:'pos',text:'Stable dividend payer — income + growth'},
-    ]
-  },
-  {
-    rank:4, signal:'watch',
-    name:'NVIDIA', flag:'🇺🇸', ticker:'NVDA', sector:'Semiconductors',
-    priceNow:140, priceTarget:155, bestCase:180, worstCase:110, currency:'$',
-    score:6.5, scoreVerdict:'Mixed signals — watch', scoreColor:'amber',
-    reasons:[
-      {type:'pos',text:'56 of 59 analysts say Buy'},
-      {type:'pos',text:'Big investors betting bullish (options)'},
-      {type:'warn',text:'Insiders selling — mixed signal'},
-    ]
-  },
-  {
-    rank:5, signal:'watch',
-    name:'Siemens Energy', flag:'🇩🇪', ticker:'ENR.DE', sector:'Energy',
-    priceNow:52, priceTarget:60, bestCase:70, worstCase:44, currency:'€',
-    score:6.7, scoreVerdict:'Good, but higher risk', scoreColor:'amber',
-    reasons:[
-      {type:'pos',text:'Positive news momentum'},
-      {type:'pos',text:'Solid financial health'},
-      {type:'warn',text:'Higher volatility expected in this sector'},
-    ]
-  },
+// ── LEARN CONTENT ────────────────────────────────────────────────────────────
+const lessons = [
+  { e:'📈', t:'Bullish vs Bearish', s:'Up trend vs down trend.',
+    b:'<strong>Bullish</strong> means prices are rising or expected to rise — investors are optimistic. <strong>Bearish</strong> means prices are falling or expected to fall — investors are pessimistic. A <em>bull market</em> is a period of rising prices (usually 20%+ gain). A <em>bear market</em> is a 20%+ decline. Our app shows the S&P 500 status at the top of every daily report.' },
+  { e:'🔥', t:'Strong Buy / Buy / Watch signals', s:'Our AI\'s confidence level.',
+    b:'<strong>🔥 Strong Buy</strong> — all signals align: good fundamentals, positive news, analysts recommend buy, insiders buying, sector rising. Highest confidence.<br><br><strong>✅ Buy</strong> — most signals are positive. Good opportunity, but not everything is perfect.<br><br><strong>👀 Watch</strong> — interesting stock but not the right timing yet. Monitor it and wait for signals to improve.' },
+  { e:'🤖', t:'AI Score (0–10)', s:'How confident the AI is overall.',
+    b:'The AI Score combines everything: machine learning model prediction, Piotroski financial health (0–9), news sentiment, analyst consensus, insider trading activity, options market signals, and sector momentum. <strong>8–10 = strong</strong>, 6–7 = good, below 5 = uncertain. It is NOT a guarantee — it is a probability-based estimate.' },
+  { e:'💼', t:'F-Score (Piotroski)', s:'Financial health of a company out of 9.',
+    b:'The Piotroski F-Score is an academic scoring system that rates company financial health on 9 criteria: profitability (is it making money?), leverage (how much debt?), and efficiency (is it growing?). <strong>7–9 = excellent</strong>, 4–6 = average, 0–3 = weak. A high F-Score means the company is financially healthy and likely to outperform.' },
+  { e:'📊', t:'P/E Ratio', s:'How expensive a stock is vs its earnings.',
+    b:'P/E = Price ÷ Earnings per share. A P/E of 20 means investors pay €20 for every €1 of profit. <strong>Low P/E (5–20)</strong> = potentially undervalued. <strong>High P/E (50+)</strong> = investors expect high future growth (like Tesla or NVIDIA). There is no single "good" P/E — it depends on the industry and growth rate.' },
+  { e:'🏢', t:'Insider Trading Signal', s:'Are company executives buying their own stock?',
+    b:'Company insiders (CEO, CFO, board members) must publicly report when they buy or sell their own company\'s shares. <strong>Insiders buying</strong> is a very bullish signal — they know their company better than anyone and are betting their own money on it rising. <strong>Insiders selling</strong> can be neutral (diversification) or bearish (they expect the price to drop).' },
+  { e:'🟢', t:'Analyst Ratings', s:'What Wall Street professionals think.',
+    b:'Professional analysts at banks (Goldman Sachs, JPMorgan, etc.) study companies full-time and publish <em>Buy, Hold, or Sell</em> ratings. When 25 out of 28 analysts say <strong>Buy</strong>, that\'s a very strong consensus. Our app shows analyst consensus as one of the signals in the Full Analysis sheet.' },
+  { e:'📰', t:'News Sentiment', s:'AI reads recent headlines for each stock.',
+    b:'Our AI uses <strong>VADER</strong> (a natural language AI) to read recent news headlines for each stock. Positive words like "record earnings", "partnership", "upgrade" score positively. Negative words like "lawsuit", "miss", "investigation" score negatively. The result is a Positive 🟢 / Neutral 😐 / Negative 🔴 rating.' },
+  { e:'📊', t:'Options Put/Call Ratio', s:'What big money is betting on.',
+    b:'Options are financial contracts that let investors bet on price direction. <em>Call options</em> = betting price goes UP. <em>Put options</em> = betting (or hedging) price goes DOWN. <strong>High put/call ratio</strong> = many professionals are protecting against a drop (bearish signal). <strong>Low ratio</strong> = mostly call buying (bullish signal). Only available for US stocks.' },
+  { e:'🌍', t:'Market Regime (Bull/Bear)', s:'Is the overall market rising or falling?',
+    b:'Our app checks whether the S&P 500 (the main US stock index) is above or below its 200-day moving average. <strong>Above = Bull market</strong> (good conditions for buying). <strong>Below = Bear market</strong> (caution — all scores are reduced by 30% automatically). Individual stocks tend to follow the overall market direction.' },
+  { e:'📈', t:'ETF vs Stock', s:'One company vs hundreds of companies.',
+    b:'A <strong>Stock</strong> is ownership in a single company (e.g., Apple). High reward potential but also higher risk if that company does badly. An <strong>ETF (Exchange Traded Fund)</strong> is a basket of many stocks — e.g., SPY tracks 500 US companies at once. ETFs offer diversification (lower risk) but usually lower returns. Perfect for beginners or as a portfolio foundation.' },
+  { e:'🪙', t:'Crypto Basics', s:'Digital currencies — high risk, high reward.',
+    b:'Cryptocurrencies are digital assets not issued by any government. <strong>Bitcoin (BTC)</strong> = digital gold, store of value. <strong>Ethereum (ETH)</strong> = a programmable blockchain for apps. Smaller coins (altcoins) are much more volatile — they can gain 300% or lose 80% in months. Our app includes the top 10 by market cap. <em>Only invest what you can afford to lose completely.</em>' },
+  { e:'📉', t:'Probability % explained', s:'What "68% chance of gaining 10%" really means.',
+    b:'When we show "3 Months: 68%", it means: <em>based on historical data, when the indicators looked like this, the stock gained at least 10% within 3 months 68% of the time</em>. It does NOT mean it will definitely happen. The remaining 32% of the time it didn\'t reach that target. Think of it like weather forecasting — 70% chance of rain doesn\'t guarantee rain.' },
 ];
 
-// ── Saved (localStorage) ─────────────────────────────────────────────────────
-const SAVED_KEY = 'stockeram_saved';
-function getSaved(){ try{ return JSON.parse(localStorage.getItem(SAVED_KEY)||'[]') }catch{ return [] } }
-function toggleSave(ticker){
-  let saved = getSaved();
-  if(saved.includes(ticker)) saved = saved.filter(t=>t!==ticker);
-  else saved.push(ticker);
-  localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
-  renderSavedScreen();
-  return saved.includes(ticker);
+// type: 'stock' | 'crypto' | 'etf'
+const picks = [
+  // ── STOCKS ────────────────────────────────────────────────────────────────
+  { type:'stock', signal:'buy',  name:'UnitedHealth',     flag:'🇺🇸', ticker:'UNH',    sector:'Healthcare',
+    priceNow:485,  priceTarget:540, bestCase:590, worstCase:435, currency:'€', score:8.5, scoreVerdict:'Strong buy signal', scoreColor:'green',
+    prob1W:62, prob1M:71, prob3M:68, prob6M:63,
+    reasons:[ {t:'pos',text:'Excellent financial health (F-Score 8/9)'},{t:'pos',text:'Executives buying their own shares'},{t:'pos',text:'23 of 28 analysts recommend Buy'} ],
+    signals:[ {l:'Company Health',val:'Excellent 💪 (F-Score 8/9)'},{l:'Analyst Rating',val:'🟢 Strong Buy — 23/28'},{l:'News Sentiment',val:'Positive 🟢'},{l:'Insider Activity',val:'🟢 Insiders buying'},{l:'Sector Trend',val:'Healthcare rising ↑'},{l:'Options Market',val:'Bullish'} ] },
+  { type:'stock', signal:'buy',  name:'SAP',              flag:'🇩🇪', ticker:'SAP.DE', sector:'Software',
+    priceNow:195,  priceTarget:214, bestCase:230, worstCase:178, currency:'€', score:7.8, scoreVerdict:'Good buy signal', scoreColor:'green',
+    prob1W:58, prob1M:65, prob3M:63, prob6M:59,
+    reasons:[ {t:'pos',text:'Strong financial health (F-Score 7/9)'},{t:'pos',text:'22 of 28 analysts say Buy'},{t:'warn',text:'Price slightly elevated — may dip first'} ],
+    signals:[ {l:'Company Health',val:'Solid ✅ (F-Score 7/9)'},{l:'Analyst Rating',val:'🟢 Buy — 22/28'},{l:'News Sentiment',val:'Slightly Positive 🟡'},{l:'Insider Activity',val:'Neutral'},{l:'Sector Trend',val:'Tech stable →'},{l:'Options Market',val:'Neutral'} ] },
+  { type:'stock', signal:'buy',  name:'Deutsche Telekom', flag:'🇩🇪', ticker:'DTE.DE', sector:'Telecom',
+    priceNow:32.5, priceTarget:38,  bestCase:42,  worstCase:29,  currency:'€', score:9.0, scoreVerdict:'Strong buy signal', scoreColor:'green',
+    prob1W:65, prob1M:74, prob3M:70, prob6M:65,
+    reasons:[ {t:'pos',text:'All 18 analysts rate Strong Buy'},{t:'pos',text:'Solid financial health'},{t:'pos',text:'Stable dividend — income + growth'} ],
+    signals:[ {l:'Company Health',val:'Solid ✅ (F-Score 6/9)'},{l:'Analyst Rating',val:'🟢 Strong Buy — 18/18'},{l:'News Sentiment',val:'Positive 🟢'},{l:'Dividend',val:'Stable payer ✅'},{l:'Sector Trend',val:'Telecom steady ↗'},{l:'Options Market',val:'N/A'} ] },
+  { type:'stock', signal:'watch',name:'NVIDIA',           flag:'🇺🇸', ticker:'NVDA',   sector:'Semiconductors',
+    priceNow:140,  priceTarget:155, bestCase:180, worstCase:110, currency:'$', score:6.5, scoreVerdict:'Mixed signals — watch', scoreColor:'amber',
+    prob1W:54, prob1M:58, prob3M:55, prob6M:50,
+    reasons:[ {t:'pos',text:'56 of 59 analysts say Buy'},{t:'pos',text:'Heavy call buying in options'},{t:'warn',text:'Insiders selling — mixed signal'} ],
+    signals:[ {l:'Company Health',val:'Strong 💪 (F-Score 8/9)'},{l:'Analyst Rating',val:'🟢 Strong Buy — 56/59'},{l:'News Sentiment',val:'Neutral 😐'},{l:'Insider Activity',val:'🔴 Insiders selling'},{l:'Sector Trend',val:'Semiconductors ↑'},{l:'Options Market',val:'🟢 Bullish (P/C 0.5)'} ] },
+  { type:'stock', signal:'buy',  name:'Apple',            flag:'🇺🇸', ticker:'AAPL',   sector:'Consumer Tech',
+    priceNow:171,  priceTarget:195, bestCase:220, worstCase:148, currency:'$', score:7.9, scoreVerdict:'Good buy signal', scoreColor:'green',
+    prob1W:59, prob1M:63, prob3M:61, prob6M:57,
+    reasons:[ {t:'pos',text:'Excellent financial health (F-Score 9/9)'},{t:'pos',text:'Consistent share buyback program'},{t:'pos',text:'38 of 42 analysts say Buy'} ],
+    signals:[ {l:'Company Health',val:'Excellent 💪 (F-Score 9/9)'},{l:'Analyst Rating',val:'🟢 Strong Buy — 38/42'},{l:'News Sentiment',val:'Positive 🟢'},{l:'Insider Activity',val:'Neutral'},{l:'Options Market',val:'🟢 Bullish'},{l:'Sector Trend',val:'Tech rising ↑'} ] },
+  { type:'stock', signal:'buy',  name:'Microsoft',        flag:'🇺🇸', ticker:'MSFT',   sector:'Cloud & AI',
+    priceNow:419,  priceTarget:470, bestCase:530, worstCase:368, currency:'$', score:8.3, scoreVerdict:'Strong buy signal', scoreColor:'green',
+    prob1W:61, prob1M:66, prob3M:64, prob6M:60,
+    reasons:[ {t:'pos',text:'AI integration driving revenue growth'},{t:'pos',text:'Excellent financial health (F-Score 9/9)'},{t:'pos',text:'40 of 44 analysts say Strong Buy'} ],
+    signals:[ {l:'Company Health',val:'Excellent 💪 (F-Score 9/9)'},{l:'Analyst Rating',val:'🟢 Strong Buy — 40/44'},{l:'News Sentiment',val:'Positive 🟢'},{l:'AI Revenue',val:'Growing fast ↑'},{l:'Sector Trend',val:'Cloud & AI ↑↑'},{l:'Options Market',val:'🟢 Bullish'} ] },
+  { type:'stock', signal:'buy',  name:'Rheinmetall',      flag:'🇩🇪', ticker:'RHM.DE', sector:'Defence',
+    priceNow:1318, priceTarget:1500,bestCase:1700,worstCase:1100,currency:'€', score:8.1, scoreVerdict:'Strong buy signal', scoreColor:'green',
+    prob1W:60, prob1M:69, prob3M:66, prob6M:62,
+    reasons:[ {t:'pos',text:'Defence spending increasing across Europe'},{t:'pos',text:'Revenue growing 40% year-over-year'},{t:'pos',text:'Strong financial health'} ],
+    signals:[ {l:'Company Health',val:'Strong 💪 (F-Score 7/9)'},{l:'Analyst Rating',val:'🟢 Strong Buy — 15/18'},{l:'News Sentiment',val:'Positive 🟢'},{l:'Macro Trend',val:'Defence budgets rising ↑'},{l:'Sector Trend',val:'Defence ↑↑'},{l:'Options Market',val:'N/A'} ] },
+  { type:'stock', signal:'buy',  name:'Cloudflare',       flag:'🇺🇸', ticker:'NET',    sector:'Cybersecurity',
+    priceNow:103,  priceTarget:125, bestCase:150, worstCase:84,  currency:'$', score:7.2, scoreVerdict:'Good buy signal', scoreColor:'green',
+    prob1W:57, prob1M:61, prob3M:59, prob6M:55,
+    reasons:[ {t:'pos',text:'Revenue growing 28% year-over-year'},{t:'pos',text:'Positive news sentiment'},{t:'warn',text:'Not yet consistently profitable'} ],
+    signals:[ {l:'Company Health',val:'Mixed ⚠️ (F-Score 5/9)'},{l:'Revenue Growth',val:'+28% YoY ✅'},{l:'Analyst Rating',val:'🟢 Buy — 22/30'},{l:'News Sentiment',val:'Positive 🟢'},{l:'Sector Trend',val:'Cybersecurity ↑'},{l:'Options Market',val:'Slightly bullish'} ] },
+  { type:'stock', signal:'watch',name:'Tesla',             flag:'🇺🇸', ticker:'TSLA',   sector:'Electric Vehicles',
+    priceNow:248,  priceTarget:290, bestCase:380, worstCase:160, currency:'$', score:6.1, scoreVerdict:'High risk — watch', scoreColor:'amber',
+    prob1W:53, prob1M:56, prob3M:53, prob6M:48,
+    reasons:[ {t:'pos',text:'Market leader in EV globally'},{t:'warn',text:'Delivery growth slowing'},{t:'warn',text:'High volatility, CEO distraction risk'} ],
+    signals:[ {l:'Company Health',val:'Mixed ⚠️ (F-Score 5/9)'},{l:'Analyst Rating',val:'🟡 Hold — 18/42 Buy'},{l:'News Sentiment',val:'Mixed 😐'},{l:'Insider Activity',val:'🔴 CEO selling'},{l:'Sector Trend',val:'EV growth slowing'},{l:'Options Market',val:'Elevated puts ⚠️'} ] },
+  // ── CRYPTO ────────────────────────────────────────────────────────────────
+  { type:'crypto', signal:'buy', name:'Bitcoin',          flag:'🪙', ticker:'BTC-USD', sector:'Store of Value',
+    priceNow:66499,priceTarget:80000,bestCase:100000,worstCase:48000,currency:'$', score:7.4, scoreVerdict:'Good buy signal', scoreColor:'green',
+    prob1W:60, prob1M:62, prob3M:60, prob6M:56,
+    reasons:[ {t:'pos',text:'Institutional adoption growing fast'},{t:'pos',text:'Supply halving reduces inflation'},{t:'warn',text:'High volatility — only invest what you can lose'} ],
+    signals:[ {l:'Market Dominance',val:'~55% of crypto market'},{l:'Institutional Flow',val:'ETF inflows strong ✅'},{l:'On-chain Activity',val:'Rising ↑'},{l:'Sentiment',val:'Positive 🟢'},{l:'Volatility',val:'High ⚠️'},{l:'Long-term Trend',val:'Bull cycle continues'} ] },
+  { type:'crypto', signal:'buy', name:'Ethereum',         flag:'🪙', ticker:'ETH-USD', sector:'Smart Contracts',
+    priceNow:1976, priceTarget:2800,bestCase:3800,worstCase:1200, currency:'$', score:7.1, scoreVerdict:'Good buy signal', scoreColor:'green',
+    prob1W:57, prob1M:59, prob3M:57, prob6M:53,
+    reasons:[ {t:'pos',text:'Largest smart contract platform worldwide'},{t:'pos',text:'Staking yield makes it deflationary'},{t:'warn',text:'Higher risk than Bitcoin'} ],
+    signals:[ {l:'Network Usage',val:'Growing ↑'},{l:'Staking Yield',val:'~4% APY ✅'},{l:'Developer Activity',val:'Very high ✅'},{l:'Sentiment',val:'Slightly Positive 🟡'},{l:'Volatility',val:'Very High ⚠️'},{l:'Bitcoin Correlation',val:'High'} ] },
+  { type:'crypto', signal:'buy', name:'Solana',           flag:'🪙', ticker:'SOL-USD', sector:'Smart Contracts',
+    priceNow:73,   priceTarget:100, bestCase:145, worstCase:42,   currency:'$', score:6.3, scoreVerdict:'Interesting — higher risk', scoreColor:'amber',
+    prob1W:55, prob1M:55, prob3M:52, prob6M:48,
+    reasons:[ {t:'pos',text:'Fastest and cheapest smart contract chain'},{t:'pos',text:'Growing NFT and DeFi ecosystem'},{t:'warn',text:'History of network outages'} ],
+    signals:[ {l:'Network Activity',val:'Rising strongly ↑'},{l:'Developer Growth',val:'Very fast ↑'},{l:'Sentiment',val:'Positive 🟢'},{l:'Volatility',val:'Very High ⚠️'},{l:'Risk Level',val:'High'},{l:'Bitcoin Correlation',val:'High'} ] },
+  { type:'crypto', signal:'buy', name:'XRP',              flag:'🪙', ticker:'XRP-USD', sector:'Payments',
+    priceNow:1.22, priceTarget:1.80,bestCase:2.50,worstCase:0.80, currency:'$', score:6.6, scoreVerdict:'Good buy signal', scoreColor:'green',
+    prob1W:56, prob1M:58, prob3M:55, prob6M:51,
+    reasons:[ {t:'pos',text:'Legal clarity after SEC case resolution'},{t:'pos',text:'Major banking partnerships announced'},{t:'warn',text:'Still dependent on regulatory environment'} ],
+    signals:[ {l:'Use Case',val:'Cross-border payments ✅'},{l:'Regulatory',val:'SEC case resolved ✅'},{l:'Partnerships',val:'100+ financial institutions'},{l:'Sentiment',val:'Positive 🟢'},{l:'Volatility',val:'High ⚠️'},{l:'Risk Level',val:'Medium-High'} ] },
+  { type:'crypto', signal:'watch',name:'BNB',             flag:'🪙', ticker:'BNB-USD', sector:'Exchange Token',
+    priceNow:600,  priceTarget:750, bestCase:900, worstCase:420,  currency:'$', score:6.4, scoreVerdict:'Interesting — watch', scoreColor:'amber',
+    prob1W:54, prob1M:57, prob3M:54, prob6M:50,
+    reasons:[ {t:'pos',text:'Powers Binance — world\'s largest crypto exchange'},{t:'pos',text:'Strong token burn mechanism'},{t:'warn',text:'Regulatory risk with Binance globally'} ],
+    signals:[ {l:'Exchange Volume',val:'Binance #1 globally'},{l:'Token Burns',val:'Regular supply reduction ✅'},{l:'Regulatory Risk',val:'High ⚠️'},{l:'Sentiment',val:'Neutral 😐'},{l:'Volatility',val:'Very High ⚠️'},{l:'Risk Level',val:'High'} ] },
+  { type:'crypto', signal:'watch',name:'Dogecoin',        flag:'🪙', ticker:'DOGE-USD',sector:'Meme / Payments',
+    priceNow:0.16, priceTarget:0.25,bestCase:0.45,worstCase:0.08, currency:'$', score:5.0, scoreVerdict:'Speculative — high risk', scoreColor:'amber',
+    prob1W:52, prob1M:50, prob3M:47, prob6M:43,
+    reasons:[ {t:'pos',text:'Large community and social media presence'},{t:'warn',text:'No fundamental utility beyond payments'},{t:'warn',text:'Extremely sensitive to social media trends'} ],
+    signals:[ {l:'Technology',val:'Basic, limited'},{l:'Community',val:'Very large ✅'},{l:'Elon Musk Factor',val:'High impact ⚠️'},{l:'Volatility',val:'Extremely High ⚠️'},{l:'Risk Level',val:'Very High'},{l:'Sentiment',val:'Mixed 😐'} ] },
+  { type:'crypto', signal:'watch',name:'Avalanche',       flag:'🪙', ticker:'AVAX-USD', sector:'Smart Contracts',
+    priceNow:28,   priceTarget:42,  bestCase:65,  worstCase:16,   currency:'$', score:5.9, scoreVerdict:'Speculative — watch', scoreColor:'amber',
+    prob1W:53, prob1M:52, prob3M:49, prob6M:45,
+    reasons:[ {t:'pos',text:'Fast and cheap blockchain with institutions'},{t:'pos',text:'Subnet technology enables enterprise use'},{t:'warn',text:'Competition from Solana and Ethereum L2s'} ],
+    signals:[ {l:'Technology',val:'Strong subnets ✅'},{l:'Institutional Use',val:'Growing ↑'},{l:'Competition',val:'Intense ⚠️'},{l:'Volatility',val:'Very High ⚠️'},{l:'Risk Level',val:'High'},{l:'Sentiment',val:'Slightly Positive 🟡'} ] },
+  { type:'crypto', signal:'watch',name:'Cosmos',          flag:'🪙', ticker:'ATOM-USD', sector:'Blockchain Infrastructure',
+    priceNow:4.2,  priceTarget:7,   bestCase:12,  worstCase:2.5,  currency:'$', score:5.5, scoreVerdict:'Speculative — watch', scoreColor:'amber',
+    prob1W:51, prob1M:48, prob3M:46, prob6M:42,
+    reasons:[ {t:'pos',text:'Interoperability hub for many blockchains'},{t:'warn',text:'Competition from newer protocols'},{t:'warn',text:'Very high volatility — small position only'} ],
+    signals:[ {l:'Technology',val:'Strong fundamentals ✅'},{l:'Competition',val:'Increasing ⚠️'},{l:'Sentiment',val:'Neutral 😐'},{l:'Volatility',val:'Extremely High ⚠️'},{l:'Risk Level',val:'Very High'},{l:'Staking Yield',val:'~14% APY'} ] },
+  { type:'crypto', signal:'watch',name:'Chainlink',       flag:'🪙', ticker:'LINK-USD', sector:'Oracle Network',
+    priceNow:14,   priceTarget:22,  bestCase:35,  worstCase:8,    currency:'$', score:6.0, scoreVerdict:'Interesting — watch', scoreColor:'amber',
+    prob1W:53, prob1M:54, prob3M:51, prob6M:47,
+    reasons:[ {t:'pos',text:'Industry standard for blockchain data feeds'},{t:'pos',text:'Used by hundreds of DeFi protocols'},{t:'warn',text:'Token price lags vs technology adoption'} ],
+    signals:[ {l:'Technology',val:'Market leader in oracles ✅'},{l:'DeFi Integration',val:'Hundreds of projects'},{l:'Sentiment',val:'Slightly Positive 🟡'},{l:'Volatility',val:'Very High ⚠️'},{l:'Risk Level',val:'High'},{l:'Bitcoin Correlation',val:'Medium'} ] },
+  // ── ETFs ──────────────────────────────────────────────────────────────────
+  { type:'etf', signal:'buy',  name:'S&P 500 (SPY)',      flag:'🇺🇸', ticker:'SPY',    sector:'US Index — 500 companies',
+    priceNow:540,  priceTarget:585, bestCase:630, worstCase:480,  currency:'$', score:7.6, scoreVerdict:'Solid long-term pick', scoreColor:'green',
+    prob1W:58, prob1M:61, prob3M:59, prob6M:56,
+    reasons:[ {t:'pos',text:'Tracks the 500 largest US companies'},{t:'pos',text:'Average historical return ~10% per year'},{t:'pos',text:'Extremely low cost — 0.09% per year'} ],
+    signals:[ {l:'Type',val:'Index ETF (500 stocks)'},{l:'Expense Ratio',val:'0.09%/year ✅'},{l:'Market Regime',val:'🟢 Bull market'},{l:'Diversification',val:'Very high ✅'},{l:'Volatility',val:'Medium'},{l:'10-Year Avg Return',val:'+13.5%/year'} ] },
+  { type:'etf', signal:'buy',  name:'NASDAQ 100 (QQQ)',   flag:'🇺🇸', ticker:'QQQ',    sector:'US Tech Index — 100 companies',
+    priceNow:470,  priceTarget:515, bestCase:570, worstCase:400,  currency:'$', score:7.5, scoreVerdict:'Solid long-term pick', scoreColor:'green',
+    prob1W:59, prob1M:62, prob3M:60, prob6M:57,
+    reasons:[ {t:'pos',text:'Top 100 US tech companies including Apple, NVIDIA, Meta'},{t:'pos',text:'AI and cloud computing boom benefits directly'},{t:'warn',text:'Higher concentration risk than S&P 500'} ],
+    signals:[ {l:'Type',val:'Tech Index ETF'},{l:'Expense Ratio',val:'0.20%/year ✅'},{l:'AI Exposure',val:'Very high ✅'},{l:'Volatility',val:'Medium-High'},{l:'Diversification',val:'Good (100 stocks)'},{l:'10-Year Avg Return',val:'+18%/year'} ] },
+  { type:'etf', signal:'buy',  name:'Vanguard All-World', flag:'🌍', ticker:'VWCE.DE', sector:'Global Index — 3,500+ companies',
+    priceNow:120,  priceTarget:130, bestCase:142, worstCase:104,  currency:'€', score:7.4, scoreVerdict:'Solid long-term pick', scoreColor:'green',
+    prob1W:57, prob1M:59, prob3M:57, prob6M:54,
+    reasons:[ {t:'pos',text:'Covers stocks from 50+ countries worldwide'},{t:'pos',text:'Maximum diversification — lowest risk ETF'},{t:'pos',text:'Very low cost — 0.22% per year'} ],
+    signals:[ {l:'Type',val:'Global Index ETF'},{l:'Expense Ratio',val:'0.22%/year ✅'},{l:'Countries',val:'50+ worldwide ✅'},{l:'Diversification',val:'Maximum ✅'},{l:'Volatility',val:'Low-Medium'},{l:'Currency',val:'EUR available'} ] },
+  { type:'etf', signal:'buy',  name:'MSCI World Quality', flag:'🌍', ticker:'IS3Q.DE', sector:'Quality Factor — 300 companies',
+    priceNow:71,   priceTarget:78,  bestCase:86,  worstCase:62,   currency:'€', score:7.9, scoreVerdict:'Strong buy signal', scoreColor:'green',
+    prob1W:58, prob1M:64, prob3M:62, prob6M:58,
+    reasons:[ {t:'pos',text:'Selects only high-quality profitable companies'},{t:'pos',text:'Historically outperforms standard index'},{t:'pos',text:'You already own this in your portfolio!'} ],
+    signals:[ {l:'Type',val:'Quality Factor ETF'},{l:'Expense Ratio',val:'0.30%/year ✅'},{l:'Selection',val:'High ROE, low debt, stable earnings'},{l:'vs MSCI World',val:'Outperforms in downturns ✅'},{l:'Volatility',val:'Medium-Low'},{l:'Recommendation',val:'Hold & buy more ✅'} ] },
+  { type:'etf', signal:'buy',  name:'iShares Core MSCI', flag:'🌍', ticker:'IWDA.AS', sector:'Developed Markets — 1,600 companies',
+    priceNow:88,   priceTarget:96,  bestCase:106, worstCase:77,   currency:'€', score:7.3, scoreVerdict:'Solid long-term pick', scoreColor:'green',
+    prob1W:57, prob1M:60, prob3M:58, prob6M:55,
+    reasons:[ {t:'pos',text:'Covers all major developed market companies'},{t:'pos',text:'Very low cost — 0.20% per year'},{t:'pos',text:'Perfect core holding for long-term investors'} ],
+    signals:[ {l:'Type',val:'Developed Markets ETF'},{l:'Expense Ratio',val:'0.20%/year ✅'},{l:'Companies',val:'1,600+ global stocks'},{l:'Diversification',val:'Very high ✅'},{l:'Volatility',val:'Low-Medium'},{l:'Currency',val:'EUR available'} ] },
+  { type:'etf', signal:'watch',name:'Gold ETF (GLD)',     flag:'🥇', ticker:'GLD',    sector:'Precious Metals',
+    priceNow:234,  priceTarget:255, bestCase:280, worstCase:205,  currency:'$', score:6.8, scoreVerdict:'Good hedge — watch', scoreColor:'green',
+    prob1W:54, prob1M:57, prob3M:56, prob6M:53,
+    reasons:[ {t:'pos',text:'Safe haven in times of uncertainty'},{t:'pos',text:'Inflation hedge — rises when dollar weakens'},{t:'warn',text:'Pays no dividends, returns lag stocks long-term'} ],
+    signals:[ {l:'Type',val:'Commodity ETF (Gold)'},{l:'Expense Ratio',val:'0.40%/year'},{l:'Inflation Hedge',val:'Strong ✅'},{l:'Safe Haven',val:'Yes — rises in crises'},{l:'Volatility',val:'Low-Medium'},{l:'Role',val:'Portfolio protection'} ] },
+  { type:'etf', signal:'watch',name:'US Bond ETF (TLT)', flag:'🇺🇸', ticker:'TLT',    sector:'US Government Bonds',
+    priceNow:88,   priceTarget:98,  bestCase:110, worstCase:78,   currency:'$', score:6.2, scoreVerdict:'Defensive — watch', scoreColor:'amber',
+    prob1W:53, prob1M:56, prob3M:55, prob6M:52,
+    reasons:[ {t:'pos',text:'Benefits if interest rates fall (expected in 2025)'},{t:'pos',text:'Highest safety — backed by US government'},{t:'warn',text:'Underperforms stocks in bull markets'} ],
+    signals:[ {l:'Type',val:'Long-term Bond ETF'},{l:'Expense Ratio',val:'0.15%/year ✅'},{l:'Interest Rate Risk',val:'High (rates fall = bond rises)'},{l:'Safety',val:'US government backed ✅'},{l:'Volatility',val:'Medium'},{l:'Use',val:'Defensive allocation'} ] },
+  { type:'etf', signal:'buy',  name:'Vanguard Total Market',flag:'🇺🇸',ticker:'VTI',  sector:'Entire US Market — 4,000 companies',
+    priceNow:270,  priceTarget:295, bestCase:325, worstCase:238,  currency:'$', score:7.2, scoreVerdict:'Solid long-term pick', scoreColor:'green',
+    prob1W:57, prob1M:60, prob3M:58, prob6M:55,
+    reasons:[ {t:'pos',text:'Broadest US market exposure — all 4,000+ companies'},{t:'pos',text:'Lowest cost ETF available — 0.03%/year'},{t:'pos',text:'Includes small, mid, and large companies'} ],
+    signals:[ {l:'Type',val:'Total Market Index ETF'},{l:'Expense Ratio',val:'0.03%/year — lowest possible ✅'},{l:'Coverage',val:'4,000+ US stocks'},{l:'Diversification',val:'Maximum US ✅'},{l:'Volatility',val:'Medium'},{l:'10-Year Avg Return',val:'+13%/year'} ] },
+  { type:'etf', signal:'buy',  name:'iShares S&P 500',   flag:'🇺🇸', ticker:'IVV',    sector:'US Index — 500 companies',
+    priceNow:540,  priceTarget:585, bestCase:630, worstCase:478,  currency:'$', score:7.5, scoreVerdict:'Solid long-term pick', scoreColor:'green',
+    prob1W:58, prob1M:61, prob3M:59, prob6M:56,
+    reasons:[ {t:'pos',text:'Same as SPY but from iShares (BlackRock)'},{t:'pos',text:'Extremely low cost — 0.03%/year'},{t:'pos',text:'One of the world\'s largest ETFs by assets'} ],
+    signals:[ {l:'Type',val:'Index ETF (500 stocks)'},{l:'Expense Ratio',val:'0.03%/year ✅'},{l:'AUM',val:'$500bn+ (very liquid)'},{l:'Market Regime',val:'🟢 Bull market'},{l:'Diversification',val:'Very high ✅'},{l:'10-Year Return',val:'+13.5%/year'} ] },
+];
+
+// ── CHART ─────────────────────────────────────────────────────────────────────
+function seededRng(seed) {
+  let s = seed % 2147483647;
+  return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
-function isSaved(ticker){ return getSaved().includes(ticker) }
 
-// ── Rendering ────────────────────────────────────────────────────────────────
-const C = 150.8; // circle circumference (2π×24)
+function smooth(pts) {
+  if (pts.length < 2) return '';
+  let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const p0 = pts[i-1], p1 = pts[i];
+    const cx1 = p0.x + (p1.x - p0.x) * 0.45;
+    const cx2 = p1.x - (p1.x - p0.x) * 0.45;
+    d += ` C${cx1.toFixed(1)},${p0.y.toFixed(1)} ${cx2.toFixed(1)},${p1.y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
+  }
+  return d;
+}
 
-function scoreOffset(score){ return C*(1-score/10) }
+function buildChart(p) {
+  const rng = seededRng(p.ticker.split('').reduce((a,c)=>a+c.charCodeAt(0),0));
+  const W=320, H=175, pL=38, pR=14, pT=18, pB=26;
+  const cW = W-pL-pR, cH = H-pT-pB;
 
-function renderPick(p, total){
+  // Generate 26 weekly historical prices
+  const N = 26;
+  const startP = p.priceNow * (0.87 + rng()*0.07);
+  const hist = [startP];
+  for (let i=1; i<N; i++) {
+    const drift = (p.priceNow - startP) / N;
+    const noise = (rng()-0.5) * hist[i-1] * 0.035;
+    hist.push(Math.max(p.worstCase*0.85, hist[i-1] + drift + noise));
+  }
+  hist[N-1] = p.priceNow;
+
+  // Future: 5 quarterly points
+  const Q = 5;
+  const futTarget = Array.from({length:Q}, (_,i) => p.priceNow + (p.priceTarget - p.priceNow) * (i/(Q-1)));
+  const futBest   = Array.from({length:Q}, (_,i) => p.priceNow + (p.bestCase   - p.priceNow) * Math.pow(i/(Q-1), 0.7));
+  const futWorst  = Array.from({length:Q}, (_,i) => p.priceNow + (p.worstCase  - p.priceNow) * Math.pow(i/(Q-1), 0.7));
+
+  // today is at 40% of chart width
+  const todayRatio = 0.40;
+  const todayX = pL + cW * todayRatio;
+  const allP = [...hist, ...futBest, ...futWorst];
+  const minP = Math.min(...allP)*0.968, maxP = Math.max(...allP)*1.032;
+  const y = v => pT + cH - ((v-minP)/(maxP-minP))*cH;
+
+  // hist x: 0 to todayX
+  const hx = i => pL + (i/(N-1)) * (todayX - pL);
+  // fut x: todayX to W-pR
+  const fx = i => todayX + (i/(Q-1)) * (W-pR-todayX);
+
+  const hPts  = hist.map((v,i) => ({x:hx(i), y:y(v)}));
+  const ftPts = futTarget.map((v,i) => ({x:fx(i), y:y(v)}));
+  const fbPts = futBest.map((v,i) => ({x:fx(i), y:y(v)}));
+  const fwPts = futWorst.map((v,i) => ({x:fx(i), y:y(v)}));
+
+  const hPath  = smooth(hPts);
+  const hArea  = hPath + ` L${hPts[N-1].x.toFixed(1)},${(pT+cH).toFixed(1)} L${pL},${(pT+cH).toFixed(1)}Z`;
+  const ftPath = smooth(ftPts);
+  const zoneD  = 'M'+fbPts.map(pt=>`${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join('L')+
+                 'L'+[...fwPts].reverse().map(pt=>`${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join('L')+'Z';
+
+  const nowY = y(p.priceNow);
+  const tgtY = y(p.priceTarget);
   const upside = Math.round((p.priceTarget/p.priceNow-1)*100);
-  const invest = 1000;
-  const ratio = invest/p.priceNow;
-  const investReturn = Math.round(p.priceTarget*ratio);
-  const saved = isSaved(p.ticker);
-  const gradId = p.scoreColor==='green'?'sg':'sa';
-  const likes = [1234,847,2100,3400,612];
-  const likeFmt = n => n>=1000?(n/1000).toFixed(1)+'k':n;
+  const tid = p.ticker.replace(/[^a-z]/gi,'');
 
-  const reasons = p.reasons.map(r=>`
-    <div class="why-item">
-      <span class="why-icon ${r.type==='pos'?'pos':'warn'}">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-          ${r.type==='pos'
-            ?'<polyline points="20 6 9 17 4 12"/>'
-            :'<line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/>'}
-        </svg>
-      </span>
-      <span>${r.text}</span>
-    </div>`).join('');
+  // Y axis labels
+  const yLabels = [0.15, 0.5, 0.85].map(r => ({
+    v: minP + (maxP-minP)*r,
+    y: pT + cH - r*cH,
+    txt: p.currency + Math.round(minP+(maxP-minP)*r).toLocaleString()
+  }));
+
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible">
+<defs>
+  <linearGradient id="hg${tid}" x1="0%" x2="100%" y1="0%" y2="0%">
+    <stop offset="0%" stop-color="#bf5af2"/><stop offset="100%" stop-color="#30d158"/>
+  </linearGradient>
+  <linearGradient id="ha${tid}" x1="0%" x2="0%" y1="0%" y2="100%">
+    <stop offset="0%" stop-color="#bf5af2" stop-opacity=".4"/><stop offset="100%" stop-color="#bf5af2" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="za${tid}" x1="0%" x2="0%" y1="0%" y2="100%">
+    <stop offset="0%" stop-color="#30d158" stop-opacity=".28"/><stop offset="100%" stop-color="#30d158" stop-opacity=".04"/>
+  </linearGradient>
+</defs>
+${yLabels.map(l=>`
+<line x1="${pL}" y1="${l.y.toFixed(1)}" x2="${W-pR}" y2="${l.y.toFixed(1)}" stroke="rgba(255,255,255,.07)" stroke-width="1"/>
+<text x="${pL-3}" y="${(l.y+3.5).toFixed(1)}" fill="rgba(255,255,255,.32)" font-size="8" text-anchor="end" font-family="-apple-system,sans-serif">${l.txt}</text>`).join('')}
+<path d="${hArea}" fill="url(#ha${tid})"/>
+<line x1="${todayX.toFixed(1)}" y1="${pT}" x2="${todayX.toFixed(1)}" y2="${pT+cH}" stroke="rgba(255,255,255,.22)" stroke-width="1" stroke-dasharray="3,3"/>
+<path d="${zoneD}" fill="url(#za${tid})"/>
+<path d="${hPath}" fill="none" stroke="url(#hg${tid})" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="${ftPath}" fill="none" stroke="#30d158" stroke-width="2" stroke-dasharray="6,4" stroke-linecap="round" opacity=".9"/>
+<circle cx="${todayX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="5" fill="#fff"/>
+<circle cx="${todayX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="8" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
+<circle cx="${(W-pR).toFixed(1)}" cy="${tgtY.toFixed(1)}" r="5" fill="#30d158"/>
+<rect x="${(W-pR-28).toFixed(1)}" y="${(tgtY-17).toFixed(1)}" width="40" height="14" rx="4" fill="rgba(48,209,88,.92)"/>
+<text x="${(W-pR-8).toFixed(1)}" y="${(tgtY-7).toFixed(1)}" fill="#000" font-size="9" font-weight="700" text-anchor="middle" font-family="-apple-system,sans-serif">+${upside}%</text>
+<text x="${pL}" y="${H-8}" fill="rgba(255,255,255,.35)" font-size="8" text-anchor="middle" font-family="-apple-system,sans-serif">−6M</text>
+<text x="${todayX.toFixed(1)}" y="${H-8}" fill="rgba(255,255,255,.55)" font-size="8" text-anchor="middle" font-weight="600" font-family="-apple-system,sans-serif">Today</text>
+<text x="${W-pR}" y="${H-8}" fill="rgba(255,255,255,.35)" font-size="8" text-anchor="end" font-family="-apple-system,sans-serif">+12M</text>
+</svg>`;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const C = 150.8;
+const SAVED_KEY = 'stockeram_saved';
+const getSaved = () => { try{return JSON.parse(localStorage.getItem(SAVED_KEY)||'[]')}catch{return []} };
+const isSaved  = t => getSaved().includes(t);
+function toggleSave(t){ let s=getSaved(); s=s.includes(t)?s.filter(x=>x!==t):[...s,t]; localStorage.setItem(SAVED_KEY,JSON.stringify(s)); renderSavedScreen(); return s.includes(t); }
+const fmtK = n => n>=1000?(n/1000).toFixed(1)+'k':String(n);
+
+// ── RENDER PICK ───────────────────────────────────────────────────────────────
+function renderPick(p, total) {
+  const upside = Math.round((p.priceTarget/p.priceNow-1)*100);
+  const invest  = Math.round(p.priceTarget / p.priceNow * 1000);
+  const saved   = isSaved(p.ticker);
+  const gid     = p.scoreColor==='green'?'sg':'sa';
+  const offset  = (C*(1-p.score/10)).toFixed(1);
+  const likes   = [1234,847,2100,3400,612];
+
+  const reasons = p.reasons.map(r=>`<div class="why-item"><span class="wicon ${r.t==='pos'?'pos':'warn'}"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${r.t==='pos'?'<polyline points="20 6 9 17 4 12"/>'  :'<line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/>'}</svg></span><span>${r.text}</span></div>`).join('');
 
   return `
-  <div class="page ${p.signal}" data-type="pick"
-       data-ticker="${p.ticker}" data-name="${p.name}"
-       data-now="${p.priceNow}" data-target="${p.priceTarget}"
-       data-best="${p.bestCase}" data-worst="${p.worstCase}"
-       data-currency="${p.currency}">
+<div class="page ${p.signal}" data-type="pick" data-rank="${p.rank}"
+  data-ticker="${p.ticker}" data-name="${p.name}"
+  data-now="${p.priceNow}" data-target="${p.priceTarget}"
+  data-best="${p.bestCase}" data-worst="${p.worstCase}" data-currency="${p.currency}"
+  data-p1="${p.prob1M}" data-p3="${p.prob3M}" data-p6="${p.prob6M}">
 
-    <div class="pick-header">
-      <span class="rank-chip">0${p.rank} of 0${total}</span>
-      <span class="signal-chip ${p.signal}">${p.signal==='buy'?'Buy':'Watch'}</span>
-    </div>
-
+  <div class="pscroll">
+    <div class="rank-chip"><span class="rchip">0${p.rank} of 0${total}</span><span class="schip ${p.signal}">${p.signal==='buy'?'Buy':'Watch'}</span></div>
     <div class="stock-id">
-      <h2 class="stock-name">${p.name} <span class="stock-flag">${p.flag}</span></h2>
-      <div class="stock-meta">
-        <span class="ticker">${p.ticker}</span>
-        <span class="sep-dot"></span>
-        <span>${p.sector}</span>
+      <div class="sname">${p.name} <span class="sflag">${p.flag}</span></div>
+      <div class="smeta"><span class="sticker">${p.ticker}</span><span class="sdot"></span><span>${p.sector}</span></div>
+    </div>
+    <div class="price-card">
+      <div class="clabel">Price Target · 12 months</div>
+      <div class="pline"><span class="pnow">${p.currency}${p.priceNow.toLocaleString()}</span><span class="parr">→</span><span class="ptgt">${p.currency}${p.priceTarget.toLocaleString()}</span><span class="pupside">↑ +${upside}%</span></div>
+      <div class="phint">Current price → Where analysts expect it to go</div>
+    </div>
+    <div class="si-row">
+      <div class="score-card">
+        <div class="scircle-wrap">
+          <svg class="scircle" viewBox="0 0 56 56"><circle class="sbg" cx="28" cy="28" r="24"/><circle class="sfg" cx="28" cy="28" r="24" stroke="url(#${gid})" stroke-dasharray="${C}" stroke-dashoffset="${offset}"/></svg>
+          <div class="snum">${p.score}</div>
+        </div>
+        <div><div class="slbl">AI Score</div><div class="sverdict ${p.scoreColor}">${p.scoreVerdict}</div></div>
+      </div>
+      <div class="invest-card">
+        <div class="invlbl">If you invest ${p.currency}1,000</div>
+        <div class="invline"><span class="invfrom">${p.currency}1,000</span><span class="invarr">→</span><span class="invto">${p.currency}${invest.toLocaleString()}</span></div>
       </div>
     </div>
-
-    <div class="price-hero">
-      <div class="price-label">Price Target · 12 months</div>
-      <div class="price-line">
-        <span class="price-now">${p.currency}${p.priceNow.toLocaleString()}</span>
-        <span class="price-arrow">→</span>
-        <span class="price-target">${p.currency}${p.priceTarget.toLocaleString()}</span>
-        <span class="price-upside">↑ +${upside}%</span>
-      </div>
-      <div class="price-horizon">Where it is now → Where analysts expect it to go</div>
+    <div class="why-section">
+      <div class="why-lbl">Why we picked it</div>
+      <div class="why-list">${reasons}</div>
     </div>
+    <div style="flex:1;min-height:0"></div>
+  </div>
 
-    <div class="score-row">
-      <div class="score-wrap">
-        <svg class="score-svg" viewBox="0 0 56 56">
-          <circle class="score-bg" cx="28" cy="28" r="24"/>
-          <circle class="score-fg" cx="28" cy="28" r="24"
-            stroke="url(#${gradId})"
-            stroke-dasharray="${C}"
-            stroke-dashoffset="${scoreOffset(p.score).toFixed(1)}"/>
-        </svg>
-        <div class="score-num">${p.score}</div>
-      </div>
-      <div class="score-info">
-        <div class="score-label">Stockeram Score</div>
-        <div class="score-verdict ${p.scoreColor}">${p.scoreVerdict}</div>
-      </div>
-    </div>
-
-    <div class="invest">
-      <div class="invest-label">If you invest ${p.currency}1,000</div>
-      <div class="invest-line main">
-        <span class="invest-from">${p.currency}1,000</span>
-        <span class="invest-arrow">→</span>
-        <span class="invest-to">${p.currency}${investReturn.toLocaleString()}</span>
-      </div>
-    </div>
-
-    <div class="why">
-      <div class="why-label">Why we picked it</div>
-      ${reasons}
-    </div>
-
-    <button class="risk-btn" onclick="openSheet(this.closest('.page'))">
-      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      See best / worst case scenarios
-    </button>
-
-    <div class="side-actions">
-      <div class="action ${saved?'saved':''}" onclick="handleSave(this,'${p.ticker}','${p.name}','${p.sector}')">
-        <div class="action-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
-        <span class="action-count">Save</span>
-      </div>
-      <div class="action" onclick="handleLike(this)">
-        <div class="action-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
-        <span class="action-count">${likeFmt(likes[p.rank-1])}</span>
-      </div>
-      <div class="action" onclick="handleShare('${p.name}','${p.ticker}')">
-        <div class="action-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></div>
-        <span class="action-count">Share</span>
-      </div>
-    </div>
-
-    <div class="cta">
-      <button class="btn-primary">Full analysis <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-      <button class="btn-icon" aria-label="Chart"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></button>
-    </div>
-  </div>`;
+  <!-- No footer here — global fixed overlays handle CTA + actions -->
+</div>`;
 }
 
-function buildFeed(){
-  const feed = document.getElementById('feed');
-  const n = picks.length;
-
-  // Intro
-  feed.insertAdjacentHTML('beforeend',`
-    <div class="page intro" data-type="intro">
-      <div class="intro-date">${META.weekday}</div>
-      <h1 class="intro-title">Today's<br>Picks</h1>
-      <div class="intro-date-big">${META.date}</div>
-      <p class="intro-sub">${n} stocks our AI thinks deserve your attention — swipe up to explore</p>
-      <div class="market-pill">Market ${META.market}</div>
-      <div class="scroll-cue">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
-        <span>Swipe up</span>
-      </div>
-    </div>`);
-
-  picks.forEach(p => feed.insertAdjacentHTML('beforeend', renderPick(p, n)));
-
-  // Outro
-  feed.insertAdjacentHTML('beforeend',`
-    <div class="page outro" data-type="outro">
-      <div class="outro-icon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <h2 class="outro-title">That's all for today</h2>
-      <p class="outro-sub">Come back tomorrow for fresh AI-powered picks.</p>
-      <button class="outro-btn" onclick="switchTab('saved')">See my saved stocks →</button>
-      <p class="outro-disc">Educational content only. Not investment advice. Past performance does not predict future results. Never invest more than you can afford to lose.</p>
-    </div>`);
+// ── FILTER ────────────────────────────────────────────────────────────────────
+let activeFilter = 'all';
+function filteredPicks() {
+  const f = activeFilter;
+  const list = f === 'all'    ? picks
+             : f === 'stock'  ? picks.filter(p => p.type === 'stock')
+             : f === 'crypto' ? picks.filter(p => p.type === 'crypto')
+             :                  picks.filter(p => p.type === 'etf');
+  return list.slice(0, 10);
+}
+function applyFilter(type) {
+  activeFilter = type;
+  document.querySelectorAll('.fpill').forEach(p =>
+    p.classList.toggle('active', p.dataset.filter === type));
+  rebuildFeed();
+}
+function rebuildFeed() {
+  const showing = filteredPicks();
+  const feedEl  = document.getElementById('feed');
+  const dotsEl  = document.getElementById('dots');
+  feedEl.innerHTML = '';
+  dotsEl.innerHTML = '';
+  showing.forEach(() => dotsEl.insertAdjacentHTML('beforeend','<div class="dot"></div>'));
+  feedEl.insertAdjacentHTML('beforeend', buildIntroHTML(showing.length));
+  showing.forEach((p, i) => feedEl.insertAdjacentHTML('beforeend', renderPick({...p, rank:i+1}, showing.length)));
+  feedEl.insertAdjacentHTML('beforeend', buildOutroHTML());
+  feedEl.scrollTo({top:0, behavior:'instant'});
+  updateDots();
 }
 
-// ── Progress dots ─────────────────────────────────────────────────────────────
-function buildDots(){
-  const container = document.getElementById('dots');
-  picks.forEach(()=> container.insertAdjacentHTML('beforeend','<div class="dot"></div>'));
+// ── BUILD FEED ────────────────────────────────────────────────────────────────
+function buildIntroHTML(count) {
+  return `<div class="page intro" data-type="intro">
+  <div class="intro-wrap">
+    <div class="i-day">${META.day}</div>
+    <h1 class="i-title">Today's<br>Picks</h1>
+    <div class="i-date">${META.date}</div>
+    <p class="i-sub">${count} top picks selected by our AI today</p>
+    <div class="mkt-pill">Market · ${META.market}</div>
+  </div>
+  <div class="swipe-cue">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+    <span>Swipe up</span>
+  </div>
+</div>`;
+}
+function buildOutroHTML() {
+  return `<div class="page outro" data-type="outro">
+  <div class="outro-inner">
+    <div class="oicon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <h2 class="otitle">That's it for today</h2>
+    <p class="osub">Come back tomorrow for fresh AI-powered picks. New analysis runs every morning.</p>
+    <button class="obtn" onclick="switchTab('saved')">My saved stocks →</button>
+    <p class="odisc">Educational content only. Not investment advice. Never invest more than you can afford to lose.</p>
+  </div>
+</div>`;
+}
+function buildFeed() {
+  rebuildFeed();
 }
 
-function updateDots(){
+// ── DOTS ─────────────────────────────────────────────────────────────────────
+function buildDots() {
+  // dots are now built inside rebuildFeed
+}
+function updateDots() {
   const feed = document.getElementById('feed');
   const pages = Array.from(feed.children);
-  const idx = Math.round(feed.scrollTop / feed.clientHeight);
+  const idx  = Math.round(feed.scrollTop / feed.clientHeight);
   const page = pages[idx];
   const dots = document.getElementById('dots');
-
-  if(!page || page.dataset.type !== 'pick'){
-    dots.style.opacity='0'; return;
-  }
+  if (!page || page.dataset.type !== 'pick') { dots.style.opacity='0'; return; }
   dots.style.opacity='1';
-  const pickIdx = picks.findIndex(p=>p.ticker===page.dataset.ticker);
-  Array.from(dots.children).forEach((d,i)=>{
+  const rank = parseInt(page.dataset.rank||'1') - 1;
+  Array.from(dots.children).forEach((d,i) => {
     d.classList.remove('done','active');
-    if(i<pickIdx) d.classList.add('done');
-    else if(i===pickIdx) d.classList.add('active');
+    if (i < rank) d.classList.add('done');
+    else if (i === rank) d.classList.add('active');
   });
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
-function handleSave(el, ticker, name, sector){
-  const nowSaved = toggleSave(ticker);
-  el.classList.toggle('saved', nowSaved);
-}
+// ── GLOBAL FIXED OVERLAY (Instagram-style) ───────────────────────────────────
+let currentPage = null;
 
-function handleLike(el){
+function showOverlays(page) {
+  currentPage = page;
+  const ticker = page.dataset.ticker;
+  const p = picks.find(x => x.ticker === ticker);
+  document.getElementById('gSave').classList.toggle('saved', isSaved(ticker));
+  document.getElementById('gLikeCount').textContent = fmtK(p ? (p.likeCount || 1200) : 1200);
+  document.getElementById('gLike').classList.remove('liked');
+  document.getElementById('actionBar').style.display = 'flex';
+}
+function hideOverlays() {
+  currentPage = null;
+  document.getElementById('actionBar').style.display = 'none';
+}
+function handleGlobalAnalysis() { if (currentPage) openAnalysis(currentPage); }
+function handleGlobalRisk()     { if (currentPage) openRisk(currentPage); }
+function handleGlobalSave() {
+  if (!currentPage) return;
+  const el = document.getElementById('gSave');
+  el.classList.toggle('saved', toggleSave(currentPage.dataset.ticker));
+}
+function handleGlobalLike() {
+  const el  = document.getElementById('gLike');
   el.classList.toggle('liked');
-  const count = el.querySelector('.action-count');
-  const val = count.textContent;
-  const n = val.includes('k') ? parseFloat(val)*1000 : parseInt(val);
-  if(el.classList.contains('liked')) count.textContent = formatCount(n+1);
-  else count.textContent = formatCount(n-1);
+  document.getElementById('gLikeCount').textContent = el.classList.contains('liked') ? 'Liked ❤️' : 'Like';
+}
+function handleGlobalShare() {
+  if (!currentPage) return;
+  const {name, ticker} = currentPage.dataset;
+  if (navigator.share) navigator.share({title:`${name} (${ticker}) — Stockeram`, url: location.href});
+  else navigator.clipboard?.writeText(location.href);
 }
 
-function formatCount(n){ return n>=1000?(n/1000).toFixed(1)+'k':n; }
-
-function handleShare(name, ticker){
-  if(navigator.share){
-    navigator.share({title:`${name} (${ticker}) — Stockeram`,text:`Check out ${name} on Stockeram!`,url:window.location.href});
-  } else {
-    navigator.clipboard?.writeText(window.location.href);
-  }
+// ── ACTIONS (legacy, kept for compatibility) ──────────────────────────────────
+function handleSave(el, ticker) { el.classList.toggle('saved', toggleSave(ticker)); }
+function handleShare(name, ticker) {
+  if (navigator.share) navigator.share({title:`${name} (${ticker}) — Stockeram`, url:location.href});
+  else navigator.clipboard?.writeText(location.href);
 }
 
-// ── Sheet ─────────────────────────────────────────────────────────────────────
-let sheetStartY = 0;
-const sheet = document.getElementById('sheet');
-const backdrop = document.getElementById('backdrop');
-
-function openSheet(page){
-  const c = page.dataset.currency;
-  const now = parseFloat(page.dataset.now);
-  const ratio = 1000/now;
-  const fmt = v => c+Math.round(parseFloat(page.dataset[v])*ratio).toLocaleString();
-  document.getElementById('sh-name').textContent = page.dataset.name;
-  document.getElementById('sh-amount').textContent = c+'1,000';
-  document.getElementById('sh-best').textContent = fmt('best');
-  document.getElementById('sh-likely').textContent = fmt('target');
-  document.getElementById('sh-worst').textContent = fmt('worst');
-  sheet.classList.add('open');
-  backdrop.classList.add('open');
+// ── SHEETS ────────────────────────────────────────────────────────────────────
+function openSheet(id) {
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
+  document.getElementById(id).classList.add('open');
+  document.getElementById('backdrop').classList.add('open');
+}
+function closeAll() {
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
+  document.getElementById('backdrop').classList.remove('open');
 }
 
-function closeSheet(){
-  sheet.classList.remove('open');
-  backdrop.classList.remove('open');
+function openRisk(page) {
+  const c = page.dataset.currency, r = 1000 / parseFloat(page.dataset.now);
+  document.getElementById('rs-name').textContent = page.dataset.name;
+  document.getElementById('rs-amt').textContent = c+'1,000';
+  document.getElementById('rs-best').textContent   = c+Math.round(parseFloat(page.dataset.best)*r).toLocaleString();
+  document.getElementById('rs-likely').textContent = c+Math.round(parseFloat(page.dataset.target)*r).toLocaleString();
+  document.getElementById('rs-worst').textContent  = c+Math.round(parseFloat(page.dataset.worst)*r).toLocaleString();
+  openSheet('risk-sheet');
 }
 
-sheet.addEventListener('touchstart', e=>{ sheetStartY = e.touches[0].clientY; });
-sheet.addEventListener('touchmove', e=>{ if(e.touches[0].clientY - sheetStartY > 80) closeSheet(); });
+function openAnalysis(page) {
+  const ticker = page.dataset.ticker;
+  const p = picks.find(x => x.ticker === ticker);
+  if (!p) return;
 
-// ── Tab switching ─────────────────────────────────────────────────────────────
+  document.getElementById('as-name').textContent = p.name;
+  document.getElementById('as-sub').textContent  = `${p.ticker} · ${p.sector} · Score ${p.score}/10`;
+  document.getElementById('as-chart').innerHTML  = buildChart(p);
+
+  const pColor = v => v >= 60 ? 'green' : 'amber';
+  [['p1w',p.prob1W||55],['p1',p.prob1M],['p3',p.prob3M],['p6',p.prob6M]].forEach(([id,val]) => {
+    const el = document.getElementById('as-'+id);
+    if(el){ el.textContent = val + '%'; el.className = 'pv ' + pColor(val); }
+  });
+
+  document.getElementById('as-signals').innerHTML = p.signals.map(s =>
+    `<div class="sig-item"><span class="sig-lbl">${s.l}</span><span class="sig-val">${s.val}</span></div>`
+  ).join('');
+
+  openSheet('analysis-sheet');
+}
+
+// Swipe sheet down to close
+document.querySelectorAll('.sheet').forEach(s => {
+  let sy = 0;
+  s.addEventListener('touchstart', e => { sy = e.touches[0].clientY; }, {passive:true});
+  s.addEventListener('touchmove',  e => { if (e.touches[0].clientY - sy > 90) closeAll(); }, {passive:true});
+});
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
 const feedEl = document.getElementById('feed');
 const dotsEl = document.getElementById('dots');
-const navEl  = document.querySelector('.nav');
 
-function switchTab(name){
-  // Hide all placeholder screens
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  // Update tab bar
-  document.querySelectorAll('.tab').forEach(t=>{
-    t.classList.toggle('active', t.dataset.tab===name);
-  });
-
-  if(name==='today'){
-    feedEl.style.display='';
-    dotsEl.style.display='';
+function switchTab(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===name));
+  const navFilter = document.getElementById('nav-filter');
+  if (name === 'today') {
+    feedEl.style.display=''; dotsEl.style.display=''; navFilter.style.display='';
   } else {
-    feedEl.style.display='none';
-    dotsEl.style.display='none';
-    const screen = document.getElementById('screen-'+name);
-    if(screen) screen.classList.add('active');
+    feedEl.style.display='none'; dotsEl.style.display='none'; navFilter.style.display='none';
+    hideOverlays();
+    document.getElementById('screen-'+name)?.classList.add('active');
     if(name==='saved') renderSavedScreen();
   }
 }
 
-function renderSavedScreen(){
+function renderSavedScreen() {
   const saved = getSaved();
-  const list  = document.getElementById('saved-list');
-  if(!saved.length){
-    list.innerHTML='<p class="saved-empty">No saved stocks yet. Swipe through today\'s picks and tap Save to keep track of your favorites.</p>';
-    return;
-  }
-  list.innerHTML = saved.map(ticker=>{
-    const pick = picks.find(p=>p.ticker===ticker);
-    const name = pick?pick.name:ticker;
-    const sector = pick?pick.sector:'';
-    return `<div class="saved-item">
-      <div><div class="saved-item-name">${name}</div><div class="saved-item-ticker">${ticker} · ${sector}</div></div>
-      <button onclick="removeSaved('${ticker}')" style="background:none;border:none;color:var(--lbl3);font-size:20px;cursor:pointer">×</button>
+  const list = document.getElementById('saved-list');
+  if (!saved.length) { list.innerHTML='<p class="saved-empty">No saved picks yet.<br>Swipe through today\'s picks and tap <strong>Save</strong>.</p>'; return; }
+  list.innerHTML = saved.map(ticker => {
+    const p = picks.find(x => x.ticker===ticker);
+    const sig = p ? (p.signal==='buy'?'✅':'👀') : '';
+    return `<div class="sitem" onclick="goToPick('${ticker}')" style="cursor:pointer">
+      <div><div class="sname">${p?p.name:ticker} ${p?p.flag:''}</div><div class="stick">${ticker}${p?' · '+p.sector:''}</div></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:14px">${sig}</span>
+        <span style="font-size:20px;color:var(--lbl3)">›</span>
+        <button class="rmbtn" onclick="event.stopPropagation();removeSaved('${ticker}')">×</button>
+      </div>
     </div>`;
   }).join('');
 }
 
-function removeSaved(ticker){
-  let saved = getSaved().filter(t=>t!==ticker);
-  localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
-  // Update save button on feed if visible
-  const page = document.querySelector(`[data-ticker="${ticker}"]`);
-  if(page) page.querySelector('.action')?.classList.remove('saved');
+function goToPick(ticker) {
+  if (activeFilter !== 'all') {
+    activeFilter = 'all';
+    document.querySelectorAll('.fpill').forEach(p => p.classList.toggle('active', p.dataset.filter==='all'));
+    rebuildFeed();
+  }
+  switchTab('today');
+  requestAnimationFrame(() => {
+    const f = document.getElementById('feed');
+    const pages = Array.from(f.children);
+    const page = pages.find(p => p.dataset.ticker === ticker);
+    if (page) {
+      f.scrollTo({top: pages.indexOf(page) * f.clientHeight, behavior: 'instant'});
+      setTimeout(() => showOverlays(page), 60);
+    }
+  });
+}
+
+function buildLearn() {
+  const list = document.getElementById('learn-list');
+  if (!list) return;
+  list.innerHTML = lessons.map((l,i) => `
+    <div class="lesson" id="lesson-${i}" onclick="toggleLesson(${i})">
+      <div class="lesson-head">
+        <span class="lesson-emoji">${l.e}</span>
+        <div style="flex:1"><div class="lesson-title">${l.t}</div><div class="lesson-simple">${l.s}</div></div>
+        <span class="lesson-chevron">›</span>
+      </div>
+      <div class="lesson-body">${l.b}</div>
+    </div>`).join('');
+}
+function toggleLesson(i){ document.getElementById('lesson-'+i).classList.toggle('open'); }
+
+function removeSaved(ticker) {
+  let s = getSaved().filter(t=>t!==ticker);
+  localStorage.setItem(SAVED_KEY, JSON.stringify(s));
+  document.querySelector(`[data-ticker="${ticker}"] .abtn`)?.classList.remove('saved');
   renderSavedScreen();
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ── INIT ─────────────────────────────────────────────────────────────────────
 buildFeed();
 buildDots();
+buildLearn();
+
+// Update fixed overlays on scroll
+document.getElementById('feed').addEventListener('scroll', () => {
+  const f = document.getElementById('feed');
+  const pages = Array.from(f.children);
+  const idx = Math.round(f.scrollTop / f.clientHeight);
+  const page = pages[idx];
+  if (page && page.dataset.type === 'pick') showOverlays(page);
+  else hideOverlays();
+}, {passive: true});
+// Measure nav after DOM + paint are complete
+requestAnimationFrame(() => requestAnimationFrame(() => setDimensions()));
 document.getElementById('feed').addEventListener('scroll', updateDots, {passive:true});
 updateDots();
-
-// Register service worker
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
-}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
 </script>
 </body>
 </html>

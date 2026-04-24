@@ -91,8 +91,8 @@ TICKER_NAMES = {
 }
 
 # Prediction targets
-HORIZONS = {"1M": 21, "3M": 63, "6M": 126}
-GAIN_THRESHOLDS = {"1M": 0.05, "3M": 0.10, "6M": 0.15}
+HORIZONS = {"1W": 5, "1M": 21, "3M": 63, "6M": 126}
+GAIN_THRESHOLDS = {"1W": 0.02, "1M": 0.05, "3M": 0.10, "6M": 0.15}
 
 DATA_PERIOD = "5y"
 MODEL_DIR = "models"

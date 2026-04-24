@@ -193,10 +193,12 @@ def predict(
     if df.empty:
         return df
 
-    p1 = df.get("prob_1M", pd.Series(0, index=df.index)).fillna(0)
-    p3 = df.get("prob_3M", pd.Series(0, index=df.index)).fillna(0)
-    p6 = df.get("prob_6M", pd.Series(0, index=df.index)).fillna(0)
-    df["score"] = (p1 * 0.20 + p3 * 0.50 + p6 * 0.30).round(1)
+    p1w = df.get("prob_1W", pd.Series(0, index=df.index)).fillna(0)
+    p1  = df.get("prob_1M", pd.Series(0, index=df.index)).fillna(0)
+    p3  = df.get("prob_3M", pd.Series(0, index=df.index)).fillna(0)
+    p6  = df.get("prob_6M", pd.Series(0, index=df.index)).fillna(0)
+    # 1W gets small weight (weaker signal), 3M stays primary
+    df["score"] = (p1w * 0.05 + p1 * 0.20 + p3 * 0.45 + p6 * 0.30).round(1)
     df.sort_values("score", ascending=False, inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
