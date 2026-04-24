@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-from config import US_STOCKS, DE_STOCKS, CRYPTO, DATA_PERIOD, CACHE_DIR, MIN_DATA_ROWS
+from config import US_STOCKS, DE_STOCKS, CRYPTO, ETFS, DATA_PERIOD, CACHE_DIR, MIN_DATA_ROWS
 
 Path(CACHE_DIR).mkdir(exist_ok=True)
 
@@ -13,6 +13,7 @@ _GROUPS = [
     ("US Stocks",      US_STOCKS),
     ("German Stocks",  DE_STOCKS),
     ("Crypto",         CRYPTO),
+    ("ETFs",           ETFS),
 ]
 
 

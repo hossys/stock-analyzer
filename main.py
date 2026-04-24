@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 
 from config import (
-    US_STOCKS, DE_STOCKS, CRYPTO, SECTOR_MAP,
+    US_STOCKS, DE_STOCKS, CRYPTO, ETFS, SECTOR_MAP,
     TICKER_NAMES, DB_PATH, TOP_N, DAILY_RUN_TIME,
 )
 from data_fetcher import fetch_all
@@ -27,6 +27,7 @@ from notifier import send_daily_digest
 
 
 def _asset_type(ticker: str) -> str:
+    if ticker in ETFS:        return "ETF"
     if ticker in US_STOCKS:   return "US Stock"
     if ticker in DE_STOCKS:   return "German Stock"
     return "Crypto"
