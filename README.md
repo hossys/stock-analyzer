@@ -1,122 +1,123 @@
-# Stock Analyzer — Professional ML-Based Buy Predictions
+# Stock Analyzer + Stockeram
 
-Ranks US stocks, German (DAX) stocks, and crypto by their probability of a meaningful price gain over the next 1, 3, and 6 months. Output is a clean ranked list — no technical jargon, just actionable buy probabilities.
+Two connected products: a Python ML backend that analyzes stocks daily, and an iOS-style PWA that presents the results beautifully.
 
 ---
 
-## What it does
+## Part 1 — Stock Analyzer (Python ML backend)
 
-- Downloads 5 years of daily price data for 80 assets (40 US stocks, 30 DAX stocks, 10 crypto) via yfinance (free)
-- Computes 28 scale-invariant features from technical indicators (internally — never shown to you)
-- Trains three LightGBM models (one per horizon) using walk-forward time-series validation + probability calibration
-- Ranks every asset by its probability of gaining **≥5% in 1 month**, **≥10% in 3 months**, **≥15% in 6 months**
-- Sends a Telegram digest every morning at 07:00
+Ranks US stocks, German (DAX) stocks, ETFs, and crypto by probability of meaningful price gain over 1, 3, and 6 months. Sends a Telegram digest every morning at 07:00.
+
+### What it does
+
+- Downloads 5 years of daily price data for **110+ assets** via yfinance (free)
+- Computes **36 features**: technical indicators, macro (VIX, yield, dollar), relative strength vs sector
+- Trains a **stacked ML ensemble** (LightGBM + XGBoost + meta-learner) using walk-forward time-series validation
+- Ranks every asset by probability of gaining ≥5% / ≥10% / ≥15% in 1M / 3M / 6M
+- Applies **8 signal boosts**: Piotroski fundamentals, VADER sentiment, insider trading, analyst consensus, options put/call ratio, sector momentum, market regime (bull/bear), earnings calendar
 - Retrains every Monday automatically
 
----
+### Universe
 
-## Quick start
+| Category | Assets |
+|---|---|
+| **US Stocks** | AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, JPM, NET, AXP, CAVA, RKLB, OKLO, IONQ, NIO, RGTI + 25 more |
+| **German / EU** | SAP, Siemens, Allianz, BMW, Deutsche Telekom, Rheinmetall, BASF, Bayer, Airbus, Linde, Commerzbank, AXA + 20 more |
+| **Crypto** | BTC, ETH, BNB, XRP, SOL, ADA, DOGE, AVAX, DOT, LINK, XLM, ATOM, TRX, SHIB |
+| **ETFs** | SPY, QQQ, IVV, VTI, VWO, IS3Q.DE, VWCE.DE, IWDA.AS, CSPX.L, GLD, TLT |
 
-### 1. Install dependencies
+### Quick start
 
 ```bash
 pip install -r requirements.txt
+python main.py          # first run trains models (~15-20 min)
+streamlit run dashboard.py  # open web dashboard
 ```
 
-### 2. Configure Telegram (optional but recommended)
-
-Copy `.env.example` to `.env` and fill in your credentials:
-
-```bash
-cp .env.example .env
-```
-
-```
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-TELEGRAM_CHAT_ID=your_chat_id_here
-```
-
-### 3. Run the analyzer
-
-```bash
-python main.py
-```
-
-The **first run** downloads ~80 tickers and trains 3 ML models — expect 10–20 minutes.
-Every subsequent daily run is fast (uses local cache + pre-trained models).
-
-### 4. Open the dashboard
-
-```bash
-streamlit run dashboard.py
-```
-
----
-
-## Project structure
+### Project files
 
 ```
 stock-analyzer/
-├── main.py             # Daily runner + scheduler (entry point)
-├── config.py           # Universe (tickers), horizons, thresholds
-├── data_fetcher.py     # yfinance download with daily file cache
-├── feature_engine.py   # 28 technical features (scale-invariant)
-├── ml_engine.py        # LightGBM training, walk-forward CV, calibration, prediction
-├── notifier.py         # Telegram daily digest
-├── dashboard.py        # Streamlit web dashboard
-├── requirements.txt
-├── .env.example
-│
-├── models/             # Saved ML models (auto-created, gitignored)
-├── cache/              # Daily price cache (auto-created, gitignored)
-├── results.db          # Prediction history in SQLite (auto-created)
-│
-│   ── Legacy (kept for reference, not used by the new system) ──
-├── plot_sender.py      # Telegram bot for chart images
-├── train_model.py
-└── generate_dataset.py
+├── main.py              # 8-stage daily pipeline (entry point)
+├── config.py            # Universe, thresholds, Telegram credentials
+├── data_fetcher.py      # Batch yfinance downloads with daily cache
+├── feature_engine.py    # 36 technical + macro + RS features
+├── ml_engine.py         # LGB + XGB stacking ensemble
+├── macro_features.py    # VIX, 10Y yield, dollar index
+├── fundamental.py       # Piotroski F-Score (9 criteria)
+├── sentiment.py         # VADER NLP on Yahoo Finance RSS
+├── insider.py           # SEC Form 4 insider buy/sell signals
+├── earnings.py          # Upcoming earnings calendar warning
+├── analyst.py           # Wall Street analyst consensus
+├── options_sentiment.py # Put/call ratio from options chain
+├── market_regime.py     # S&P 500 bull/bear + sector momentum
+├── outcome_tracker.py   # Tracks prediction vs actual results
+├── notifier.py          # Telegram daily digest
+├── dashboard.py         # Streamlit web dashboard
+└── .github/workflows/   # GitHub Actions — runs daily at 07:00 UTC
 ```
 
----
-
-## Output example
-
-```
-─────────────────────────────────────────────────────────────────
-RANK  NAME                   TYPE            1M      3M      6M    SCORE
-─────────────────────────────────────────────────────────────────
-1     NVIDIA                 US Stock      71.2%   68.4%   64.1%    67.8
-2     SAP                    German Stock  65.3%   63.1%   59.8%    63.0
-3     Bitcoin                Crypto        69.1%   61.2%   55.4%    61.9
-...
-─────────────────────────────────────────────────────────────────
-Probabilities = P(price up ≥5%/10%/15% in 1M/3M/6M)
-```
-
----
-
-## ML details
+### ML details
 
 | | |
 |---|---|
-| **Model** | LightGBM (gradient boosting) with sigmoid probability calibration |
-| **Training data** | All tickers pooled, ~5 years daily = ~100k rows |
-| **Validation** | Walk-forward TimeSeriesSplit (5 folds) — no data leakage |
-| **Retraining** | Automatic every Monday |
-| **Features** | 28 indicators: RSI, MACD, Bollinger %B, EMA ratios, ATR, ADX, OBV, ROC, 52-week position, volume ratio, seasonality |
-| **Targets** | Binary: did price rise ≥5%/10%/15% in 21/63/126 trading days? |
-| **Score** | Weighted composite: 20% × 1M + 50% × 3M + 30% × 6M |
+| **Models** | LightGBM + XGBoost → LogisticRegression meta-learner (stacking) |
+| **Validation** | Walk-forward TimeSeriesSplit — no data leakage |
+| **Retraining** | Every Monday (auto-detects feature count changes) |
+| **Features** | 36: returns, RSI×3, MACD, BB, EMA ratios, ATR, ADX, OBV, ROC, 52W range, VIX, yield, dollar, sector RS, 12M-1M momentum |
+| **Labels** | Binary: price gains ≥5%/10%/15% in 21/63/126 trading days |
+| **Boosts** | Fundamentals ±15, Analysts ±15, Insiders ±12, Sentiment ±10, Options ±10, Sector ±8, Earnings ×0.7 |
+
+### Telegram output example
+
+```
+📊 Your Daily Stock Picks — April 24, 2026
+
+🌍 Market: Healthy & Growing 🟢
+The S&P 500 is 7.0% above its long-term average.
+
+━━━━━━━━━━━━━━━━━━━━━
+🥇 🇺🇸 UnitedHealth (UNH)
+Signal: 🔥 STRONG BUY
+
+📈 How likely is it to rise?
+  • In 1 month  → 71% chance of gaining ≥5%
+  • In 3 months → 68% chance of gaining ≥10%
+  • In 6 months → 63% chance of gaining ≥15%
+
+💼 Company health: Excellent 💪 (F-Score 8/9)
+📰 News mood: Positive 🟢
+🏢 Insider activity: 🟢 Insiders buying
+🟢 Analysts: Strong Buy — 23/28
+```
+
+### GitHub Actions (cloud, no PC needed)
+
+Set two repository secrets (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`), then it runs automatically every morning. Trigger manually from the Actions tab.
 
 ---
 
-## Covered assets
+## Part 2 — Stockeram (iOS PWA)
 
-**US Stocks (40):** AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, JPM, V, UNH, XOM, LLY, JNJ, MA, HD, AVGO, PG, MRK, COST, ABBV, CVX, WMT, BAC, KO, PEP, NFLX, TMO, AMD, ADBE, CRM, ORCL, CSCO, QCOM, TXN, INTU, AMGN, BKNG, PYPL, UBER, COIN
+Instagram/TikTok-style mobile app: swipe through daily stock picks with beautiful cards, AI score, price chart, and full analysis.
 
-**German Stocks / DAX (30):** SAP, Siemens, Allianz, BMW, Mercedes-Benz, Deutsche Telekom, BASF, Bayer, Airbus, Linde, Munich Re, Rheinmetall, RWE, Volkswagen, Deutsche Bank, Infineon, Adidas, Henkel, E.ON, Fresenius, DHL, Zalando, Vonovia, Continental, Deutsche Börse, Brenntag, HeidelbergMaterials, Siemens Healthineers, Siemens Energy, Merck KGaA
+**Live:** `https://stockeram-app.hsaberiansani.workers.dev`  
+**Repo:** `https://github.com/hossys/Stockeram_app`
 
-**Crypto (10):** Bitcoin, Ethereum, BNB, XRP, Solana, Cardano, Dogecoin, Avalanche, Polkadot, Chainlink
+### Features
+
+- Vertical swipe feed (TikTok-style scroll-snap)
+- Filter by: 🌍 All · 📈 Stocks · 🪙 Crypto · 📊 ETFs
+- Each pick shows: AI score, price target, upside %, "if you invest €1,000" calculator
+- **Full Analysis** sheet: SVG price chart (6M history + 12M prediction cone), AI probabilities, all signals
+- **Risk Scenarios** sheet: best / most likely / worst case
+- Save to watchlist (localStorage), Like, Share
+- Installable on iPhone: Safari → Share → Add to Home Screen
+
+### Deploy
+
+Static files only (HTML + CSS + JS, no framework). Deploy to Cloudflare Pages, Railway, or any static host.
 
 ---
 
-> **Disclaimer:** This tool is for personal research only. Statistical predictions are not financial advice.
+> **Disclaimer:** Not financial advice. All predictions are AI-generated statistical estimates based on historical patterns.
