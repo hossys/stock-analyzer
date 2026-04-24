@@ -1063,61 +1063,74 @@ function openAnalysis(page) {
 }
 
 function openPickDetail(ticker) {
-  const p = picks.find(x => x.ticker === ticker);
+  try {
+    const p = picks.find(x => x.ticker === ticker);
 
-  if (!p) {
-    document.getElementById('as-name').textContent = ticker;
-    document.getElementById('as-sub').textContent  = 'No ML prediction yet — runs every morning';
-    document.getElementById('as-rec').innerHTML    = `<div style="background:rgba(255,255,255,.06);border-radius:14px;padding:14px 16px;text-align:center;color:var(--lbl2);font-size:13px">Prediction data will appear after the next daily analysis run.</div>`;
-    document.getElementById('as-chart').innerHTML  = '';
-    ['p1w','p1','p3','p6'].forEach(id => {
+    const setEl = (id, val, prop='textContent') => {
+      const el = document.getElementById(id);
+      if (el) el[prop] = val;
+    };
+
+    if (!p) {
+      setEl('as-name', ticker);
+      setEl('as-sub',  'No ML prediction yet — runs every morning');
+      setEl('as-rec',  '<div style="background:rgba(255,255,255,.06);border-radius:14px;padding:14px 16px;text-align:center;color:var(--lbl2);font-size:13px">Prediction data will appear after the next daily analysis run.</div>', 'innerHTML');
+      setEl('as-chart', '', 'innerHTML');
+      ['p1w','p1','p3','p6'].forEach(id => {
+        const el = document.getElementById('as-'+id);
+        if (el) { el.textContent = '—'; el.className = 'pv'; }
+      });
+      setEl('as-signals', '', 'innerHTML');
+      openSheet('analysis-sheet');
+      return;
+    }
+
+    // ── Recommendation box ────────────────────────────────────────────────────
+    const rec        = getRecommendation(p);
+    const sellAdvice = getSellAdvice(p);
+    const upside     = p.priceNow > 0 ? Math.round((p.priceTarget / p.priceNow - 1) * 100) : 0;
+    const recBg      = rec.cls === 'buy'  ? 'rgba(48,209,88,.12)'
+                     : rec.cls === 'sell' ? 'rgba(255,69,58,.12)'
+                     :                      'rgba(255,159,10,.12)';
+    const recBorder  = rec.cls === 'buy'  ? 'rgba(48,209,88,.3)'
+                     : rec.cls === 'sell' ? 'rgba(255,69,58,.3)'
+                     :                      'rgba(255,159,10,.3)';
+
+    const recEl = document.getElementById('as-rec');
+    if (recEl) recEl.innerHTML = `
+      <div style="background:${recBg};border:1px solid ${recBorder};border-radius:14px;padding:14px 16px">
+        <div style="font-size:20px;font-weight:800;margin-bottom:6px">${rec.label}</div>
+        ${rec.action.includes('buy') && p.priceNow > 0 ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--lbl2)">Now: <strong style="color:#fff">${p.currency}${p.priceNow.toLocaleString()}</strong></span>
+            <span style="color:var(--lbl3)">→</span>
+            <span style="font-size:13px;color:var(--green)">Target: <strong>${p.currency}${p.priceTarget.toLocaleString()} (+${upside}%)</strong></span>
+          </div>` : ''}
+        ${sellAdvice ? `<div style="font-size:12px;color:var(--lbl2);line-height:1.5;border-top:.5px solid rgba(255,255,255,.1);padding-top:8px;margin-top:4px">⚠️ ${sellAdvice}</div>` : ''}
+        <div style="font-size:11px;color:var(--lbl3);margin-top:6px">AI Score: ${p.score}/10 · ${p.scoreVerdict}</div>
+      </div>`;
+
+    setEl('as-name', `${p.flag} ${p.name}`);
+    setEl('as-sub',  `${p.ticker} · ${p.sector}`);
+
+    const chartEl = document.getElementById('as-chart');
+    if (chartEl) chartEl.innerHTML = (p.priceNow > 0 && p.priceTarget > 0) ? buildChart(p) : '';
+
+    const pColor = v => v >= 60 ? 'green' : 'amber';
+    [['p1w', p.prob1W||55], ['p1', p.prob1M||0], ['p3', p.prob3M||0], ['p6', p.prob6M||0]].forEach(([id, val]) => {
       const el = document.getElementById('as-'+id);
-      if (el) { el.textContent = '—'; el.className = 'pv'; }
+      if (el) { el.textContent = val + '%'; el.className = 'pv ' + pColor(val); }
     });
-    document.getElementById('as-signals').innerHTML = '';
+
+    const sigEl = document.getElementById('as-signals');
+    if (sigEl) sigEl.innerHTML = (p.signals||[]).map(s =>
+      `<div class="sig-item"><span class="sig-lbl">${s.l}</span><span class="sig-val">${s.val}</span></div>`
+    ).join('');
+
     openSheet('analysis-sheet');
-    return;
+  } catch(e) {
+    console.error('openPickDetail error:', e);
   }
-
-  // ── Recommendation box ──────────────────────────────────────────────────────
-  const rec       = getRecommendation(p);
-  const sellAdvice = getSellAdvice(p);
-  const upside    = Math.round((p.priceTarget / p.priceNow - 1) * 100);
-  const recBg     = rec.cls === 'buy'  ? 'rgba(48,209,88,.12)'
-                  : rec.cls === 'sell' ? 'rgba(255,69,58,.12)'
-                  :                      'rgba(255,159,10,.12)';
-  const recBorder = rec.cls === 'buy'  ? 'rgba(48,209,88,.3)'
-                  : rec.cls === 'sell' ? 'rgba(255,69,58,.3)'
-                  :                      'rgba(255,159,10,.3)';
-
-  document.getElementById('as-rec').innerHTML = `
-    <div style="background:${recBg};border:1px solid ${recBorder};border-radius:14px;padding:14px 16px">
-      <div style="font-size:20px;font-weight:800;margin-bottom:6px">${rec.label}</div>
-      ${rec.action.includes('buy') ? `
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-          <span style="font-size:13px;color:var(--lbl2)">Now: <strong style="color:#fff">${p.currency}${p.priceNow.toLocaleString()}</strong></span>
-          <span style="color:var(--lbl3)">→</span>
-          <span style="font-size:13px;color:var(--green)">Target: <strong>${p.currency}${p.priceTarget.toLocaleString()} (+${upside}%)</strong></span>
-        </div>` : ''}
-      ${sellAdvice ? `<div style="font-size:12px;color:var(--lbl2);line-height:1.5;border-top:.5px solid rgba(255,255,255,.1);padding-top:8px;margin-top:4px">⚠️ ${sellAdvice}</div>` : ''}
-      <div style="font-size:11px;color:var(--lbl3);margin-top:6px">AI Score: ${p.score}/10 · ${p.scoreVerdict}</div>
-    </div>`;
-
-  document.getElementById('as-name').textContent = `${p.flag} ${p.name}`;
-  document.getElementById('as-sub').textContent  = `${p.ticker} · ${p.sector}`;
-  document.getElementById('as-chart').innerHTML  = buildChart(p);
-
-  const pColor = v => v >= 60 ? 'green' : 'amber';
-  [['p1w', p.prob1W||55], ['p1', p.prob1M], ['p3', p.prob3M], ['p6', p.prob6M]].forEach(([id, val]) => {
-    const el = document.getElementById('as-'+id);
-    if (el) { el.textContent = val + '%'; el.className = 'pv ' + pColor(val); }
-  });
-
-  document.getElementById('as-signals').innerHTML = p.signals.map(s =>
-    `<div class="sig-item"><span class="sig-lbl">${s.l}</span><span class="sig-val">${s.val}</span></div>`
-  ).join('');
-
-  openSheet('analysis-sheet');
 }
 
 // Swipe sheet down to close
