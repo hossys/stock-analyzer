@@ -39,25 +39,30 @@ def fetch_fundamentals(ticker: str) -> dict:
         return {}
 
 
+def _n(val, default=0):
+    """Safely convert yfinance values to float — they sometimes return strings."""
+    try:
+        return float(val) if val is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
 def _piotroski_score(fund: dict) -> int:
     """Simplified Piotroski F-Score (0-9). Higher = stronger fundamentals."""
     score = 0
-    # Profitability
-    if (fund.get("roe") or 0) > 0:                          score += 1  # positive ROE
-    if (fund.get("profit_margin") or 0) > 0:                score += 1  # positive margin
-    if (fund.get("revenue_growth") or 0) > 0:               score += 1  # growing revenue
-    if (fund.get("earnings_growth") or 0) > 0:              score += 1  # growing earnings
-    # Financial strength
-    debt = fund.get("debt_to_equity") or 999
-    if debt < 100:                                           score += 1  # low debt
-    if (fund.get("current_ratio") or 0) > 1.0:              score += 1  # liquid
-    # Valuation / efficiency
-    pb = fund.get("price_to_book") or 999
-    if 0 < pb < 5:                                           score += 1  # reasonable P/B
-    pe = fund.get("pe_ratio") or 999
-    if 0 < pe < 30:                                          score += 1  # reasonable P/E
-    fpe = fund.get("forward_pe") or 999
-    if 0 < fpe < pe:                                         score += 1  # forward P/E improving
+    if _n(fund.get("roe")) > 0:                          score += 1
+    if _n(fund.get("profit_margin")) > 0:                score += 1
+    if _n(fund.get("revenue_growth")) > 0:               score += 1
+    if _n(fund.get("earnings_growth")) > 0:              score += 1
+    debt = _n(fund.get("debt_to_equity"), 999)
+    if 0 < debt < 100:                                   score += 1
+    if _n(fund.get("current_ratio")) > 1.0:              score += 1
+    pb = _n(fund.get("price_to_book"), 999)
+    if 0 < pb < 5:                                       score += 1
+    pe  = _n(fund.get("pe_ratio"), 999)
+    fpe = _n(fund.get("forward_pe"), 999)
+    if 0 < pe < 30:                                      score += 1
+    if 0 < fpe < pe:                                     score += 1
     return score
 
 
@@ -83,14 +88,14 @@ def score_fundamentals(fund: dict) -> tuple[float, str, str]:
 
     # Build short display string from available data
     parts = []
-    pe = fund.get("pe_ratio")
-    if pe:
+    pe = _n(fund.get("pe_ratio"))
+    if pe and pe > 0:
         parts.append(f"P/E {pe:.0f}")
-    margin = fund.get("profit_margin")
-    if margin is not None:
+    margin = _n(fund.get("profit_margin"))
+    if margin:
         parts.append(f"Margin {margin*100:.0f}%")
-    growth = fund.get("revenue_growth")
-    if growth is not None:
+    growth = _n(fund.get("revenue_growth"))
+    if growth:
         sign = "+" if growth >= 0 else ""
         parts.append(f"Rev {sign}{growth*100:.0f}%")
     display = " | ".join(parts[:3]) if parts else "N/A"
