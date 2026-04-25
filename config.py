@@ -3,8 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7969528399:AAGk2OmA-jOO3sB8Qxz02AeSGuY9MFyfYa0")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "171471899")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 US_STOCKS = [
     # Large cap core
