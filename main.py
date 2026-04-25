@@ -261,7 +261,7 @@ def _build_reasons(row: pd.Series) -> list:
     if any(x in fund for x in ["Weak","Poor"]):
         reasons.append({"t":"warn","text":f"Financial health: {fund}"})
     if not [r for r in reasons if r["t"]=="pos"]:
-        reasons.insert(0,{"t":"pos","text":f"AI Score: {float(row.get('adj_score') or row.get('score') or 0):.1f}/10"})
+        reasons.insert(0,{"t":"pos","text":f"AI Score: {float(row.get('adj_score') or row.get('score') or 0)/10:.1f}/10"})
     return reasons[:3]
 
 def _build_signals(row: pd.Series) -> list:
@@ -289,6 +289,8 @@ def _export_picks_json(predictions: pd.DataFrame, regime: dict, prices: dict):
         verdict = ("Strong buy signal" if score >= 65 else
                    "Good buy signal"   if score >= 55 else
                    "Mixed — watch"     if score >= 45 else "Weak signals")
+        # App displays score as X/10 — convert from 0-100 internal scale
+        score_out = round(score / 10.0, 1)
         picks_out.append({
             "ticker":       ticker,
             "name":         TICKER_NAMES.get(ticker, ticker),
@@ -296,7 +298,7 @@ def _export_picks_json(predictions: pd.DataFrame, regime: dict, prices: dict):
             "flag":         _flag_for(ticker),
             "sector":       _SECTORS.get(ticker, "Global Markets"),
             "signal":       signal,
-            "score":        round(score, 1),
+            "score":        score_out,
             "scoreVerdict": verdict,
             "scoreColor":   "green" if score >= 55 else "amber",
             "priceNow":     round(price, 2),

@@ -1545,6 +1545,22 @@ function removeSaved(ticker) {
   renderSavedScreen();
 }
 
+// ── SERVICE WORKER UPDATE LISTENER ──────────────────────────────────────────
+// When a new SW activates, force a one-time reload so users get the latest UI
+// (handles Cloudflare/CDN edge caching of stale HTML).
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'sw-updated') {
+      const flag = 'sw-reloaded-' + e.data.version;
+      if (!sessionStorage.getItem(flag)) {
+        sessionStorage.setItem(flag, '1');
+        location.reload();
+      }
+    }
+  });
+  navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+}
+
 // ── INIT ─────────────────────────────────────────────────────────────────────
 // Fetch live ML predictions first, then build UI with fresh data
 fetchLivePicks().then(() => {
@@ -1568,7 +1584,6 @@ document.getElementById('feed').addEventListener('scroll', () => {
 // (setDimensions called inside fetchLivePicks().then() above)
 document.getElementById('feed').addEventListener('scroll', updateDots, {passive:true});
 updateDots();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
 </script>
 </body>
 </html>
