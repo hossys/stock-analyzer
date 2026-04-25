@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Stockeram">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -199,8 +200,6 @@ html,body{
 .tab svg{width:26px;height:26px}
 .tlbl{font-size:10px;font-weight:500}
 
-.home-ind{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:130px;height:5px;background:#fff;border-radius:3px;z-index:999;pointer-events:none}
-
 /* SHEETS */
 .backdrop{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:800;pointer-events:none;transition:background .3s}
 .backdrop.open{background:rgba(0,0,0,.6);pointer-events:auto}
@@ -327,6 +326,20 @@ html,body{
 .add-check.on{background:var(--brand);font-size:14px;color:#fff}
 .add-check.off{border:1.5px solid rgba(255,255,255,.2)}
 
+/* Sign-in sheet */
+.signed-in-row{display:flex;align-items:center;gap:14px;padding:8px 0 4px}
+.signed-in-row img{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.1);object-fit:cover}
+.signed-in-row img[src=""]{display:none}
+.signout-btn{width:100%;background:rgba(255,69,58,.12);color:var(--red);border:1px solid rgba(255,69,58,.25);
+  border-radius:14px;padding:14px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:14px}
+.signout-btn:active{opacity:.8;transform:scale(.98)}
+.notif-btn{width:100%;background:var(--brand);color:#fff;border:none;border-radius:14px;
+  padding:14px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:14px}
+.notif-btn:active{opacity:.85;transform:scale(.98)}
+.notif-btn.enabled{background:rgba(48,209,88,.15);color:var(--green);border:1px solid rgba(48,209,88,.3)}
+.profile-dot{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:var(--green);border:1.5px solid #000}
+.nbtn{position:relative}
+
 /* Learn — clean redesign */
 .learn-list{width:100%;overflow-y:auto;padding-bottom:20px}
 .lesson{border-bottom:.5px solid rgba(255,255,255,.08);cursor:pointer;overflow:hidden}
@@ -362,7 +375,7 @@ html,body{
     <div class="logo-row"><div class="logo">S</div>Stockeram</div>
     <div class="nav-btns">
       <button class="nbtn" onclick="switchTab('saved')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
-      <button class="nbtn" onclick="switchTab('profile')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+      <button class="nbtn" id="profileBtn" onclick="openSignInSheet()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
     </div>
   </div>
   <div class="nav-filter" id="nav-filter">
@@ -384,7 +397,6 @@ html,body{
   <div class="tab" data-tab="learn" onclick="switchTab('learn')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg><span class="tlbl">Learn</span></div>
   <div class="tab" data-tab="portfolio" onclick="switchTab('portfolio')"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg><span class="tlbl">Portfolio</span></div>
 </div>
-<div class="home-ind"></div>
 
 <!-- Add holding sheet -->
 <div class="sheet" id="add-sheet">
@@ -486,6 +498,42 @@ html,body{
     <div class="sig-list" id="as-signals"></div>
   </div>
   <div class="sh-note"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Educational content only. Not investment advice. Never invest more than you can afford to lose.</span></div>
+</div>
+
+<!-- Sign-in / Profile sheet -->
+<div class="sheet" id="signin-sheet">
+  <div class="sh-handle"></div>
+  <div id="signin-out" style="display:block">
+    <h3 class="sh-title">Sign in to Stockeram</h3>
+    <p class="sh-sub">Sync your portfolio across devices and get push alerts when stocks flip from buy to sell.</p>
+    <div id="googleBtnContainer" style="display:flex;justify-content:center;padding:16px 0 8px"></div>
+    <p style="font-size:11px;color:var(--lbl3);margin-top:14px;line-height:1.5;text-align:center">
+      Stockeram only stores your email + portfolio. Educational tool — not investment advice.
+    </p>
+  </div>
+  <div id="signin-in" style="display:none">
+    <h3 class="sh-title">Your account</h3>
+    <div class="signed-in-row">
+      <img id="userAvatar" alt="" referrerpolicy="no-referrer" />
+      <div style="flex:1;min-width:0">
+        <div id="userName" style="font-size:16px;font-weight:700;letter-spacing:-.01em"></div>
+        <div id="userEmail" style="font-size:12px;color:var(--lbl2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      </div>
+    </div>
+    <div id="syncStatus" style="font-size:12px;color:var(--lbl2);text-align:center;padding:14px 0;border-top:.5px solid var(--sep);margin-top:14px">
+      Synced ✓
+    </div>
+    <button class="notif-btn" id="notifBtn" onclick="toggleNotifications()" style="display:none">
+      🔔 Enable buy/sell alerts
+    </button>
+    <p id="notifHint" style="font-size:11px;color:var(--lbl3);text-align:center;margin-top:6px;line-height:1.4;display:none">
+      Get notified when your stocks flip from buy to sell.
+    </p>
+    <button class="notif-test-btn" id="notifTestBtn" onclick="sendTestNotification()" style="display:none;width:100%;background:none;color:var(--lbl2);border:1px solid var(--sep);border-radius:14px;padding:11px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px">
+      Send me a test notification
+    </button>
+    <button class="signout-btn" onclick="signOut()">Sign out</button>
+  </div>
 </div>
 
 <script>
@@ -1544,6 +1592,341 @@ function removeSaved(ticker) {
   document.querySelector(`[data-ticker="${ticker}"] .abtn`)?.classList.remove('saved');
   renderSavedScreen();
 }
+
+// ── AUTH + SYNC ─────────────────────────────────────────────────────────────
+// Sign in with Google → get a session JWT → sync portfolio/saved/liked across
+// devices and back up to Cloudflare D1. Anonymous users keep working with
+// localStorage only — sign-in is fully opt-in.
+const GOOGLE_CLIENT_ID = '673980627753-73r0o0ku4mapsut7os3086iin6oj5icj.apps.googleusercontent.com';
+const AUTH_KEY = 'stockeram_auth';
+
+const getAuth = () => { try { return JSON.parse(localStorage.getItem(AUTH_KEY)) || null; } catch { return null; } };
+const setAuth = a => localStorage.setItem(AUTH_KEY, JSON.stringify(a));
+const clearAuth = () => localStorage.removeItem(AUTH_KEY);
+
+async function api(path, options = {}) {
+  const auth = getAuth();
+  const headers = { ...(options.headers || {}) };
+  if (auth?.token) headers['Authorization'] = 'Bearer ' + auth.token;
+  if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+  const res = await fetch(path, { ...options, headers });
+  if (res.status === 401) { clearAuth(); renderAuthState(); }
+  return res;
+}
+
+function openSignInSheet() {
+  renderAuthState();
+  openSheet('signin-sheet');
+}
+
+async function onGoogleCredential(response) {
+  setSyncStatus('Signing in…');
+  try {
+    const res = await api('/api/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ credential: response.credential })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Sign-in failed (HTTP ' + res.status + ')');
+    }
+    const data = await res.json();
+    setAuth({ token: data.token, user: data.user });
+    setSyncStatus('Uploading your data…');
+    await syncLocalToApi();
+    setSyncStatus('Pulling latest…');
+    await syncApiToLocal();
+    setSyncStatus('Synced ✓');
+    renderAuthState();
+  } catch (e) {
+    alert('Sign-in failed: ' + e.message);
+    setSyncStatus('');
+  }
+}
+
+async function syncLocalToApi() {
+  const portfolio = getPortfolio();
+  const saved     = getSaved();
+  const liked     = getLikedMap();
+  const tasks = [];
+  if (portfolio.length) tasks.push(api('/api/portfolio', { method: 'POST', body: JSON.stringify({ tickers: portfolio }) }));
+  if (saved.length)     tasks.push(api('/api/saved',     { method: 'POST', body: JSON.stringify({ tickers: saved }) }));
+  const likedEntries = Object.entries(liked).map(([ticker, d]) => ({ ticker, snapshot: d.snapshot, likedAt: d.likedAt }));
+  if (likedEntries.length) tasks.push(api('/api/liked', { method: 'POST', body: JSON.stringify({ entries: likedEntries }) }));
+  await Promise.all(tasks);
+}
+
+async function syncApiToLocal() {
+  const [pRes, sRes, lRes] = await Promise.all([
+    api('/api/portfolio'),
+    api('/api/saved'),
+    api('/api/liked'),
+  ]);
+  if (pRes.ok) {
+    const d = await pRes.json();
+    localStorage.setItem(PORT_KEY, JSON.stringify(d.tickers || []));
+  }
+  if (sRes.ok) {
+    const d = await sRes.json();
+    localStorage.setItem(SAVED_KEY, JSON.stringify(d.tickers || []));
+  }
+  if (lRes.ok) {
+    const d = await lRes.json();
+    localStorage.setItem(LIKED_KEY, JSON.stringify(d.liked || {}));
+  }
+  renderPortfolioScreen();
+  renderSavedScreen();
+  renderLikedSection();
+}
+
+function signOut() {
+  clearAuth();
+  renderAuthState();
+  closeAll();
+  // Note: localStorage portfolio/saved/liked stay — user keeps their data on this device.
+}
+
+function setSyncStatus(text) {
+  const el = document.getElementById('syncStatus');
+  if (el) el.textContent = text;
+}
+
+let _googleBtnRendered = false;
+function renderAuthState() {
+  const auth = getAuth();
+  const out = document.getElementById('signin-out');
+  const inn = document.getElementById('signin-in');
+  const dot = document.getElementById('profileBtn')?.querySelector('.profile-dot');
+
+  if (auth?.user) {
+    if (out) out.style.display = 'none';
+    if (inn) inn.style.display = 'block';
+    document.getElementById('userName').textContent  = auth.user.name || 'Signed in';
+    document.getElementById('userEmail').textContent = auth.user.email || '';
+    const av = document.getElementById('userAvatar');
+    if (av) av.src = auth.user.picture || '';
+    // Add green dot to profile button
+    if (!dot) {
+      const btn = document.getElementById('profileBtn');
+      if (btn) {
+        const d = document.createElement('span');
+        d.className = 'profile-dot';
+        btn.appendChild(d);
+      }
+    }
+  } else {
+    if (out) out.style.display = 'block';
+    if (inn) inn.style.display = 'none';
+    if (dot) dot.remove();
+    // Render the Google button (one time, after gsi script loads)
+    if (window.google?.accounts?.id && !_googleBtnRendered) {
+      try {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: onGoogleCredential,
+          auto_select: false,
+        });
+        const container = document.getElementById('googleBtnContainer');
+        if (container) {
+          container.innerHTML = '';
+          google.accounts.id.renderButton(container, {
+            theme: 'filled_black', size: 'large', text: 'signin_with', shape: 'pill', width: 260,
+          });
+          _googleBtnRendered = true;
+        }
+      } catch (e) { console.warn('Google button render failed:', e); }
+    }
+  }
+}
+
+// Patch the existing toggle functions so they ALSO call the API when signed in.
+// We wrap, not replace, to preserve all existing behavior.
+const _origToggleSave = toggleSave;
+toggleSave = function(t) {
+  const result = _origToggleSave(t);
+  if (getAuth()) {
+    if (result) api('/api/saved', { method: 'POST', body: JSON.stringify({ ticker: t }) });
+    else        api('/api/saved/' + encodeURIComponent(t), { method: 'DELETE' });
+  }
+  return result;
+};
+
+const _origTogglePortfolio = togglePortfolio;
+togglePortfolio = function(ticker) {
+  const before = getPortfolio().includes(ticker);
+  _origTogglePortfolio(ticker);
+  const after = getPortfolio().includes(ticker);
+  if (getAuth()) {
+    if (after && !before) api('/api/portfolio', { method: 'POST', body: JSON.stringify({ ticker }) });
+    else if (before && !after) api('/api/portfolio/' + encodeURIComponent(ticker), { method: 'DELETE' });
+  }
+};
+
+const _origToggleLikedPick = toggleLikedPick;
+toggleLikedPick = function(ticker) {
+  const result = _origToggleLikedPick(ticker);
+  if (getAuth()) {
+    if (result) {
+      const map = getLikedMap();
+      const entry = map[ticker];
+      api('/api/liked', { method: 'POST', body: JSON.stringify({ ticker, snapshot: entry?.snapshot, likedAt: entry?.likedAt }) });
+    } else {
+      api('/api/liked/' + encodeURIComponent(ticker), { method: 'DELETE' });
+    }
+  }
+  return result;
+};
+
+// ── PUSH NOTIFICATIONS ──────────────────────────────────────────────────────
+function urlBase64ToUint8Array(base64) {
+  const padding = '='.repeat((4 - base64.length % 4) % 4);
+  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+async function getPushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+
+async function isNotificationEnabled() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
+  return !!(await getPushSubscription());
+}
+
+async function refreshNotifButton() {
+  const btn  = document.getElementById('notifBtn');
+  const hint = document.getElementById('notifHint');
+  if (!btn) return;
+  // Only show when signed in
+  if (!getAuth()) {
+    btn.style.display  = 'none';
+    if (hint) hint.style.display = 'none';
+    return;
+  }
+  // Browser-level support check
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    btn.style.display  = 'block';
+    btn.disabled       = true;
+    btn.textContent    = '🔔 Notifications not supported';
+    btn.classList.remove('enabled');
+    if (hint) {
+      hint.style.display = 'block';
+      hint.textContent   = 'On iPhone, this only works after adding the app to your Home Screen.';
+    }
+    return;
+  }
+  btn.style.display = 'block';
+  btn.disabled      = false;
+  if (hint) hint.style.display = 'block';
+  const testBtn = document.getElementById('notifTestBtn');
+  if (await isNotificationEnabled()) {
+    btn.textContent = '🔔 Notifications enabled — tap to disable';
+    btn.classList.add('enabled');
+    if (hint) hint.textContent = 'You\'ll get a notification when one of your stocks flips from buy to sell.';
+    if (testBtn) testBtn.style.display = 'block';
+  } else {
+    btn.textContent = '🔔 Enable buy/sell alerts';
+    btn.classList.remove('enabled');
+    if (hint) hint.textContent = 'Get notified when your stocks flip from buy to sell.';
+    if (testBtn) testBtn.style.display = 'none';
+  }
+}
+
+async function sendTestNotification() {
+  const btn = document.getElementById('notifTestBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const res = await api('/api/push/test', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.sent) throw new Error(data.error || 'Failed to send (server returned ' + res.status + ')');
+    btn.textContent = `✓ Sent — should arrive in a few seconds`;
+  } catch (e) {
+    btn.textContent = '⚠️ ' + e.message;
+  }
+  setTimeout(() => { btn.disabled = false; btn.textContent = 'Send me a test notification'; }, 4000);
+}
+
+async function toggleNotifications() {
+  const btn = document.getElementById('notifBtn');
+  if (!btn || btn.disabled) return;
+  const existing = await getPushSubscription();
+
+  // Already subscribed → unsubscribe
+  if (existing) {
+    try {
+      await api('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: existing.endpoint }) });
+      await existing.unsubscribe();
+    } catch (e) { console.warn('Unsubscribe failed:', e); }
+    refreshNotifButton();
+    return;
+  }
+
+  // Subscribe flow
+  btn.disabled    = true;
+  btn.textContent = '🔔 Requesting permission…';
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      btn.disabled    = false;
+      btn.textContent = '🔔 Permission denied';
+      setTimeout(refreshNotifButton, 1500);
+      return;
+    }
+
+    // Get the VAPID public key from the server
+    const vapidRes = await api('/api/push/vapid');
+    if (!vapidRes.ok) throw new Error('Could not get VAPID key from server');
+    const { publicKey } = await vapidRes.json();
+    if (!publicKey) throw new Error('VAPID public key not configured on server');
+
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+
+    // Send subscription to server
+    const json = sub.toJSON();
+    const subscribeRes = await api('/api/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+    });
+    if (!subscribeRes.ok) {
+      const err = await subscribeRes.json().catch(() => ({}));
+      throw new Error(err.error || 'Subscribe failed');
+    }
+  } catch (e) {
+    alert('Notifications setup failed: ' + e.message);
+  }
+  btn.disabled = false;
+  refreshNotifButton();
+}
+
+// Refresh the notification button state every time the sign-in sheet opens.
+const _origOpenSignInSheet = openSignInSheet;
+openSignInSheet = function() {
+  _origOpenSignInSheet();
+  setTimeout(refreshNotifButton, 100);
+};
+
+// On every load, if signed in, pull latest from API in the background.
+(async function pullOnLoadIfSignedIn() {
+  if (!getAuth()) return;
+  try { await syncApiToLocal(); } catch (e) { console.warn('Background sync failed:', e); }
+})();
+
+// Render auth state once Google's script has loaded
+window.addEventListener('load', () => {
+  setTimeout(renderAuthState, 300);
+});
 
 // ── SERVICE WORKER UPDATE LISTENER ──────────────────────────────────────────
 // When a new SW activates, force a one-time reload so users get the latest UI
