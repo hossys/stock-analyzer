@@ -241,6 +241,20 @@ def _price_targets(price: float, score: float) -> dict:
         "worst":  round(price * (1 - ret * 0.7), 2),
     }
 
+
+def _recommendation(score_out: float, signal: str) -> str:
+    """
+    Compute the buy/hold/watch/sell recommendation.
+    Mirrors the frontend getRecommendation() exactly so the daily diff
+    matches what users see in the app.
+    score_out is the 0-10 scale value exported in picks.json.
+    """
+    if score_out >= 7.5 and signal == "buy": return "buy-more"
+    if score_out >= 6.0 and signal == "buy": return "buy-more"
+    if score_out >= 5.5: return "hold"
+    if score_out >= 4.5: return "watch"
+    return "sell"
+
 def _build_reasons(row: pd.Series) -> list:
     reasons = []
     fund = str(row.get("fund_label") or "")
@@ -317,7 +331,16 @@ def _export_picks_json(predictions: pd.DataFrame, regime: dict, prices: dict):
             "earningsNote": str(row.get("earnings_note") or ""),
             "reasons":      _build_reasons(row),
             "signals":      _build_signals(row),
+            "recommendation": _recommendation(score_out, signal),
         })
+    # Read yesterday's picks BEFORE overwriting — for daily diff.
+    previous_picks = []
+    try:
+        with open("picks.json", encoding="utf-8") as f:
+            previous_picks = json.load(f).get("picks", [])
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
     output = {
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
         "market": {
@@ -330,6 +353,67 @@ def _export_picks_json(predictions: pd.DataFrame, regime: dict, prices: dict):
     with open("picks.json","w",encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False)
     print(f"  Exported {len(picks_out)} picks → picks.json")
+
+    # Diff against yesterday and trigger Web Push to subscribed users.
+    _notify_recommendation_changes(picks_out, previous_picks)
+
+
+def _notify_recommendation_changes(new_picks: list, previous_picks: list) -> None:
+    """
+    Compare today's recommendations with yesterday's. For every ticker whose
+    recommendation flipped, POST the change to the Stockeram Worker which
+    sends a Web Push notification to every user holding that ticker.
+    """
+    if not previous_picks:
+        print("  No previous picks data — first run, skipping diff.")
+        return
+
+    admin_token = os.environ.get("STOCKERAM_ADMIN_TOKEN")
+    if not admin_token:
+        print("  STOCKERAM_ADMIN_TOKEN not set — skipping push notification trigger.")
+        return
+
+    api_url = os.environ.get("STOCKERAM_API_URL", "https://stockeram-app.hsaberiansani.workers.dev").rstrip("/")
+
+    prev_recs = {p["ticker"]: p.get("recommendation") for p in previous_picks if p.get("ticker")}
+    changes = []
+    for p in new_picks:
+        ticker  = p.get("ticker")
+        new_rec = p.get("recommendation")
+        old_rec = prev_recs.get(ticker)
+        if old_rec and new_rec and old_rec != new_rec:
+            changes.append({
+                "ticker": ticker,
+                "name":   p.get("name") or ticker,
+                "oldRec": old_rec,
+                "newRec": new_rec,
+                "score":  p.get("score"),
+            })
+
+    if not changes:
+        print("  No recommendation changes — no push notifications needed.")
+        return
+
+    summary = ", ".join(f"{c['ticker']} {c['oldRec']}→{c['newRec']}" for c in changes[:10])
+    print(f"  {len(changes)} ticker(s) flipped: {summary}{' ...' if len(changes) > 10 else ''}")
+
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            f"{api_url}/api/admin/notify-changes",
+            data=json.dumps({"changes": changes}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "X-Admin-Token": admin_token},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode("utf-8")
+            try:
+                result = json.loads(body)
+                print(f"  Worker: sent={result.get('sent', 0)} failed={result.get('failed', 0)}")
+            except json.JSONDecodeError:
+                print(f"  Worker: {body[:200]}")
+    except Exception as e:
+        print(f"  Push notify failed: {e}")
 
 
 def run():
